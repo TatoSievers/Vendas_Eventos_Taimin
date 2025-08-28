@@ -256,16 +256,21 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         return;
     }
 
+    // Build a clean payload. This object matches the SalesData type but starts without id and created_at
     const salePayload: SalesData = {
       ...formData,
-      id: isEditing && editingSale ? editingSale.id : '',
-      created_at: isEditing && editingSale ? editingSale.created_at : new Date().toISOString(),
       nomeUsuario: currentUser,
       nomeEvento: currentEventName,
       dataEvento: currentEventDate,
-      formaPagamento: finalPaymentMethod || formData.formaPagamento,
+      formaPagamento: finalPaymentMethod,
       produtos: selectedProducts,
     };
+
+    // If editing, add the id and created_at fields back in.
+    if (isEditing && editingSale) {
+      salePayload.id = editingSale.id;
+      salePayload.created_at = editingSale.created_at;
+    }
 
     await onSaveSale(salePayload, isEditing);
 

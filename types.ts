@@ -5,8 +5,8 @@ export interface ProdutoVenda {
 }
 
 export interface SalesData {
-  id: string; // Unique ID for each sale
-  created_at: string; // Supabase timestamp
+  id?: string; // Unique ID for each sale, must be optional for new records
+  created_at?: string; // Supabase timestamp, must be optional for new records
   nomeUsuario: string; // User who registered the sale
   nomeEvento: string;
   dataEvento: string; // Stored as YYYY-MM-DD
