@@ -102,8 +102,8 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
   };
 
   const validateDDD = (dddValue: string): boolean => {
-    if (!/^\d{3}$/.test(dddValue)) {
-      setDddError('DDD deve conter 3 dígitos numéricos.');
+    if (!/^\d{2}$/.test(dddValue)) {
+      setDddError('DDD deve conter 2 dígitos numéricos.');
       return false;
     }
     setDddError(null);
@@ -119,10 +119,10 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         ...prevData,
         [name]: numericValue,
       }));
-      if (numericValue.length === 3) {
+      if (numericValue.length === 2) {
         validateDDD(numericValue);
       } else if (numericValue.length > 0) {
-        setDddError('DDD deve conter 3 dígitos numéricos.');
+        setDddError('DDD deve conter 2 dígitos numéricos.');
       } else {
         setDddError(null);
       }
@@ -379,11 +379,11 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
             value={formData.ddd} 
             onChange={handleChange} 
             onBlur={handleDddBlur}
-            placeholder="Ex: 011" 
+            placeholder="Ex: 11" 
             required 
             Icon={PhoneIcon} 
-            maxLength={3} // Corrected maxLength
-            pattern="\d{3}" // HTML5 pattern for basic validation
+            maxLength={2} // Corrected maxLength to 2
+            pattern="\d{2}" // HTML5 pattern for basic validation
           />
           <InputField label="Telefone" id="telefoneNumero" name="telefoneNumero" type="text" value={formData.telefoneNumero} onChange={handleChange} placeholder="Ex: 90000-0000" required Icon={PhoneIcon} className="md:col-span-2"/>
         </div>
