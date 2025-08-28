@@ -45,7 +45,7 @@ const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard,
         'CEP': sale.cep,
         'Forma de Pagamento': sale.formaPagamento,
         // Product data handled below based on exportType
-        'Cód. Cliente': sale.codCliente,
+        'Cód. Cliente': sale.codCliente || '-',
         'Observação': sale.observacao || '-',
       };
 
@@ -251,7 +251,7 @@ const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard,
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200">{sale.cep}</td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.formaPagamento}</td>
                 <td className="px-3 py-4 text-sm text-gray-200 whitespace-pre-wrap break-words">{formatProductsForPdf(sale.produtos)}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200">{sale.codCliente}</td>
+                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200">{sale.codCliente || '-'}</td>
                 <td className="px-3 py-4 text-sm text-gray-200 whitespace-pre-wrap break-words">{sale.observacao || '-'}</td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.email}</td>
               </tr>

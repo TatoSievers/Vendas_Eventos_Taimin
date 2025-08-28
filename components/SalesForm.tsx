@@ -393,7 +393,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         <InputField label="Logradouro (Rua)" id="logradouroRua" name="logradouroRua" type="text" value={formData.logradouroRua} onChange={handleChange} placeholder="Ex: Rua Exemplo" required Icon={MapPinIcon}/>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6">
             <InputField label="Número" id="numeroEndereco" name="numeroEndereco" type="text" value={formData.numeroEndereco} onChange={handleChange} placeholder="Ex: 123" required Icon={MapPinIcon}/>
-            <InputField label="Complemento" id="complemento" name="complemento" type="text" value={formData.complemento} onChange={handleChange} placeholder="Ex: Apto 4B" Icon={MapPinIcon} className="md:col-span-2"/>
+            <InputField label="Complemento" id="complemento" name="complemento" type="text" value={formData.complemento || ''} onChange={handleChange} placeholder="Ex: Apto 4B" Icon={MapPinIcon} className="md:col-span-2"/>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6">
           <InputField label="Bairro" id="bairro" name="bairro" type="text" value={formData.bairro} onChange={handleChange} placeholder="Ex: Centro" required Icon={BuildingOfficeIcon}/>
@@ -492,8 +492,8 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         </div>
 
         <h3 className="text-xl font-semibold text-gray-200 pt-4 pb-2 border-b border-slate-700">Outras Informações</h3>
-        <InputField label="Código do Cliente" id="codCliente" name="codCliente" type="text" value={formData.codCliente} onChange={handleChange} placeholder="Ex: A05271" Icon={CodeBracketIcon}/>
-        <TextAreaField label="Observação" id="observacao" name="observacao" value={formData.observacao} onChange={handleChange} placeholder="Alguma observação relevante..." rows={3} Icon={DocumentTextIcon}/>
+        <InputField label="Código do Cliente" id="codCliente" name="codCliente" type="text" value={formData.codCliente || ''} onChange={handleChange} placeholder="Ex: A05271" Icon={CodeBracketIcon}/>
+        <TextAreaField label="Observação" id="observacao" name="observacao" value={formData.observacao || ''} onChange={handleChange} placeholder="Alguma observação relevante..." rows={3} Icon={DocumentTextIcon}/>
 
         <div className="flex flex-col sm:flex-row gap-4 pt-6">
             <button

@@ -20,7 +20,7 @@ export interface SalesData {
   
   logradouroRua: string; 
   numeroEndereco: string; // To avoid conflict with product 'unidades' or other 'numero'
-  complemento: string;
+  complemento: string | null;
   bairro: string;
   cidade: string;
   estado: string;
@@ -30,8 +30,8 @@ export interface SalesData {
   
   produtos: ProdutoVenda[];
   
-  observacao: string;
-  codCliente: string;
+  observacao: string | null;
+  codCliente: string | null;
 }
 
 // For fields that are part of SalesData but might be handled differently in forms
