@@ -468,7 +468,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
                 <button
                     type="button"
                     onClick={handleAddProduct}
-                    className="bg-primary hover:bg-primary-dark text-white font-semibold py-3 px-3 rounded-md shadow-md flex items-center justify-center"
+                    className="bg-slate-600 hover:bg-slate-500 text-white font-semibold py-3 px-3 rounded-md shadow-md flex items-center justify-center"
                     title="Adicionar Produto"
                 >
                     <PlusCircleIcon className="h-5 w-5" />
@@ -499,7 +499,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
             <button
             type="submit"
             disabled={isSubmitting || cepLoading || !!dddError}
-            className="w-full sm:w-auto flex-grow bg-primary hover:bg-primary-dark text-white font-semibold py-3 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-primary-light focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto flex-grow bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
             aria-live="polite"
             >
             {isSubmitting ? (

@@ -24,26 +24,49 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchSales = async () => {
       try {
-        const { data, error } = await supabase
+        // Step 1: Fetch all main sales records
+        const { data: salesData, error: salesError } = await supabase
           .from('sales')
-          .select('*, sale_products(nomeProduto, unidades)')
+          .select('*')
           .order('created_at', { ascending: false });
 
-        if (error) {
-          throw error;
+        if (salesError) throw salesError;
+        if (!salesData) {
+          setAllSales([]);
+          return;
         }
 
-        if (data) {
-          const formattedSales = data.map(sale => {
-            const { sale_products, ...rest } = sale;
-            return {
-              ...rest,
-              produtos: sale_products || [],
-            } as SalesData;
-          });
-          setAllSales(formattedSales);
-          console.log(`Vendas Taimin: ${formattedSales.length} sales records loaded successfully from Supabase.`);
+        // Step 2: Fetch all related products in a single query if there are sales
+        let productsBySaleId = new Map<string, { nomeProduto: string; unidades: number }[]>();
+        if (salesData.length > 0) {
+            const saleIds = salesData.map(s => s.id);
+            const { data: productsData, error: productsError } = await supabase
+              .from('sale_products')
+              .select('sale_id, nomeProduto, unidades')
+              .in('sale_id', saleIds);
+            
+            if (productsError) throw productsError;
+
+            // Step 3: Create a map for efficient product lookups
+            if (productsData) {
+              productsData.forEach(p => {
+                if (!productsBySaleId.has(p.sale_id)) {
+                  productsBySaleId.set(p.sale_id, []);
+                }
+                productsBySaleId.get(p.sale_id)!.push({ nomeProduto: p.nomeProduto, unidades: p.unidades });
+              });
+            }
         }
+        
+        // Step 4: Combine sales data with their respective products
+        const formattedSales = salesData.map(sale => ({
+          ...sale,
+          produtos: productsBySaleId.get(sale.id) || [],
+        })) as SalesData[];
+
+        setAllSales(formattedSales);
+        console.log(`Vendas Taimin: ${formattedSales.length} sales records loaded successfully from Supabase.`);
+        
       } catch (error) {
         console.error("Error loading sales from Supabase:", error);
         alert("Falha ao carregar os dados de vendas. Verifique sua conexão e tente recarregar a página.");
@@ -96,7 +119,7 @@ const App: React.FC = () => {
       }
     } else {
       // CREATE logic
-      const { id, produtos, ...newSaleDetails } = saleData;
+      const { id, produtos, created_at, ...newSaleDetails } = saleData;
       try {
         const { data: insertedSale, error: saleInsertError } = await supabase
           .from('sales')
