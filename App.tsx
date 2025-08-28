@@ -5,10 +5,9 @@ import SalesList from './components/SalesList';
 import InitialSetupForm from './components/InitialSetupForm';
 import ManagerialDashboard from './components/ManagerialDashboard';
 import { SalesData, EventDetail, UserDetail, InitialSetupData, PaymentMethodDetail } from './types';
+import { supabase } from './lib/supabaseClient';
 
 type AppView = 'setup' | 'salesFormAndList' | 'dashboard';
-
-const LOCAL_STORAGE_KEY = 'vendasTaiminData';
 
 const App: React.FC = () => {
   const [allSales, setAllSales] = useState<SalesData[]>([]);
@@ -21,36 +20,42 @@ const App: React.FC = () => {
 
   const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
 
-  // Load sales data from localStorage on initial mount
+  // Load sales data from Supabase on initial mount
   useEffect(() => {
-    try {
-      const storedSales = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (storedSales) {
-        const parsedSales: SalesData[] = JSON.parse(storedSales);
-        setAllSales(parsedSales);
-        console.log(`Vendas Taimin: ${parsedSales.length} sales records loaded successfully from localStorage.`);
-      } else {
-        console.log("Vendas Taimin: No sales records found in localStorage. Starting fresh.");
+    const fetchSales = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('sales')
+          .select('*, sale_products(nomeProduto, unidades)')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
+          const formattedSales = data.map(sale => {
+            const { sale_products, ...rest } = sale;
+            return {
+              ...rest,
+              produtos: sale_products || [],
+            } as SalesData;
+          });
+          setAllSales(formattedSales);
+          console.log(`Vendas Taimin: ${formattedSales.length} sales records loaded successfully from Supabase.`);
+        }
+      } catch (error) {
+        console.error("Error loading sales from Supabase:", error);
+        alert("Falha ao carregar os dados de vendas. Verifique sua conexão e tente recarregar a página.");
         setAllSales([]);
+      } finally {
+        setIsDataLoaded(true);
       }
-    } catch (error) {
-      console.error("Error loading sales from localStorage:", error);
-      setAllSales([]); // Start with empty if localStorage is corrupt
-    }
-    setIsDataLoaded(true); // Mark data as loaded (or attempted to load)
+    };
+
+    fetchSales();
   }, []);
 
-  // Save sales data to localStorage whenever it changes
-  useEffect(() => {
-    if (isDataLoaded) { // Only save after initial load attempt
-        try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(allSales));
-        } catch (error) {
-            console.error("Error saving sales to localStorage:", error);
-            // Consider notifying user if storage is full or disabled
-        }
-    }
-  }, [allSales, isDataLoaded]);
 
   const handleInitialSetupComplete = (setupData: InitialSetupData) => {
     setCurrentUser(setupData.userName);
@@ -60,20 +65,80 @@ const App: React.FC = () => {
     setCurrentView('salesFormAndList');
   };
 
-  const handleSaveSale = (saleData: SalesData, isEditing: boolean) => {
-    setAllSales(prevSales => {
-      if (isEditing && editingSaleId) {
-        return prevSales.map(sale =>
-          sale.id === editingSaleId ? { ...saleData, id: editingSaleId } : sale
-        );
-      } else {
-        // For new sales, generate a simple unique ID client-side
-        const newSaleWithId = { ...saleData, id: Date.now().toString(36) + Math.random().toString(36).substr(2) };
-        return [...prevSales, newSaleWithId];
+  const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
+    if (isEditing && editingSaleId) {
+      // UPDATE logic
+      const { produtos, ...saleDetails } = saleData;
+      try {
+        const { error: saleUpdateError } = await supabase
+          .from('sales')
+          .update(saleDetails)
+          .eq('id', editingSaleId);
+        if (saleUpdateError) throw saleUpdateError;
+
+        // Easiest way to handle product updates: delete old, insert new
+        const { error: productDeleteError } = await supabase.from('sale_products').delete().eq('sale_id', editingSaleId);
+        if (productDeleteError) throw productDeleteError;
+
+        const productsToInsert = produtos.map(p => ({ sale_id: editingSaleId, nomeProduto: p.nomeProduto, unidades: p.unidades }));
+        if (productsToInsert.length > 0) {
+            const { error: productInsertError } = await supabase.from('sale_products').insert(productsToInsert);
+            if (productInsertError) throw productInsertError;
+        }
+
+        setAllSales(prevSales => prevSales.map(sale =>
+            sale.id === editingSaleId ? { ...saleDetails, id: editingSaleId, produtos } : sale
+        ));
+
+      } catch (error) {
+        console.error("Error updating sale:", error);
+        alert("Ocorreu um erro ao atualizar a venda. Por favor, tente novamente.");
       }
-    });
-    setEditingSaleId(null); // Clear editing state after save
+    } else {
+      // CREATE logic
+      const { id, produtos, ...newSaleDetails } = saleData;
+      try {
+        const { data: insertedSale, error: saleInsertError } = await supabase
+          .from('sales')
+          .insert(newSaleDetails)
+          .select()
+          .single();
+        if (saleInsertError || !insertedSale) throw saleInsertError || new Error("Failed to get new sale ID");
+
+        const productsToInsert = produtos.map(p => ({ sale_id: insertedSale.id, nomeProduto: p.nomeProduto, unidades: p.unidades }));
+         if (productsToInsert.length > 0) {
+            const { error: productInsertError } = await supabase.from('sale_products').insert(productsToInsert);
+            if (productInsertError) throw productInsertError;
+        }
+
+        const newSaleWithProducts = { ...insertedSale, produtos } as SalesData;
+        setAllSales(prevSales => [newSaleWithProducts, ...prevSales]);
+
+      } catch (error) {
+        console.error("Error creating sale:", error);
+        alert("Ocorreu um erro ao registrar a nova venda. Por favor, tente novamente.");
+      }
+    }
+    setEditingSaleId(null);
   };
+
+  const handleDeleteSale = async (saleId: string) => {
+    if (!window.confirm("Tem certeza que deseja excluir esta venda? Esta ação não pode ser desfeita.")) {
+      return;
+    }
+    try {
+      // Thanks to 'ON DELETE CASCADE' in the database schema, we only need to delete the sale.
+      const { error } = await supabase.from('sales').delete().eq('id', saleId);
+      if (error) throw error;
+
+      setAllSales(prevSales => prevSales.filter(sale => sale.id !== saleId));
+      console.log(`Sale with ID ${saleId} deleted successfully.`);
+    } catch (error) {
+      console.error("Error deleting sale:", error);
+      alert("Ocorreu um erro ao excluir a venda. Por favor, tente novamente.");
+    }
+  };
+
 
   const handleSetEditingSale = (saleId: string | null) => {
     if (saleId) {
@@ -146,8 +211,7 @@ const App: React.FC = () => {
 
   const saleBeingEdited = editingSaleId ? allSales.find(s => s.id === editingSaleId) || null : null;
   
-  // Prevent rendering main content until data is loaded to avoid flicker or premature calculations
-  if (!isDataLoaded && currentView !== 'setup') {
+  if (!isDataLoaded) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-slate-900 to-slate-700 text-gray-200">
         <svg className="animate-spin h-10 w-10 text-primary mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -196,6 +260,7 @@ const App: React.FC = () => {
               sales={allSales} 
               onNavigateToDashboard={navigateToDashboard}
               onEditSale={handleSetEditingSale}
+              onDeleteSale={handleDeleteSale}
             />
           </>
         )}

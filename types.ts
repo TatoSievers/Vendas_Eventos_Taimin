@@ -6,6 +6,7 @@ export interface ProdutoVenda {
 
 export interface SalesData {
   id: string; // Unique ID for each sale
+  created_at: string; // Supabase timestamp
   nomeUsuario: string; // User who registered the sale
   nomeEvento: string;
   dataEvento: string; // Stored as YYYY-MM-DD
@@ -34,7 +35,7 @@ export interface SalesData {
 }
 
 // For fields that are part of SalesData but might be handled differently in forms
-export type SalesFormData = Omit<SalesData, 'id' | 'nomeUsuario' | 'produtos' | 'nomeEvento' | 'dataEvento'>;
+export type SalesFormData = Omit<SalesData, 'id' | 'nomeUsuario' | 'produtos' | 'nomeEvento' | 'dataEvento' | 'created_at'>;
 
 
 export interface InputFieldProps {
@@ -107,4 +108,5 @@ export interface SalesListProps {
   sales: SalesData[];
   onNavigateToDashboard: () => void;
   onEditSale: (saleId: string) => void;
+  onDeleteSale: (saleId: string) => void;
 }

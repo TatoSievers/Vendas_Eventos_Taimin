@@ -58,7 +58,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
 
   useEffect(() => {
     if (isEditing && editingSale) {
-      const { produtos, id, nomeUsuario, nomeEvento, dataEvento, ...editableData } = editingSale;
+      const { produtos, id, nomeUsuario, nomeEvento, dataEvento, created_at, ...editableData } = editingSale;
       setFormData(editableData);
       setSelectedProducts(produtos || []);
       
@@ -288,13 +288,17 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
          }
     }
 
+    // FIX: Add created_at to satisfy the SalesData type.
+    // For new sales, a new ISO string is generated.
+    // For existing sales, the original created_at is preserved.
     const salePayload: SalesData = {
       ...formData,
-      id: isEditing && editingSale ? editingSale.id : '', 
-      nomeUsuario: currentUser, 
-      nomeEvento: currentEventName, 
-      dataEvento: currentEventDate, 
-      formaPagamento: finalPaymentMethod || formData.formaPagamento, 
+      id: isEditing && editingSale ? editingSale.id : '',
+      created_at: isEditing && editingSale ? editingSale.created_at : new Date().toISOString(),
+      nomeUsuario: currentUser,
+      nomeEvento: currentEventName,
+      dataEvento: currentEventDate,
+      formaPagamento: finalPaymentMethod || formData.formaPagamento,
       produtos: selectedProducts,
     };
 

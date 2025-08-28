@@ -1,12 +1,12 @@
 
 import React from 'react';
 import { SalesData, ProdutoVenda, SalesListProps as SalesListPropsType } from '../types';
-import { DownloadIcon, ChartBarIcon, PencilIcon } from './icons';
+import { DownloadIcon, ChartBarIcon, PencilIcon, TrashIcon } from './icons';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable'; // Import for the autoTable plugin
 
-const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard, onEditSale }) => {
+const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard, onEditSale, onDeleteSale }) => {
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
@@ -26,7 +26,7 @@ const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard,
   const getExportData = (exportType: 'excel' | 'pdf') => {
     const MAX_PRODUCTS_COLUMNS_EXCEL = 5; // Max product pairs (Name, Units) for Excel
 
-    return sales.slice().reverse().map(sale => {
+    return sales.map(sale => {
       const baseSaleData: { [key: string]: any } = {
         'Usuário': sale.nomeUsuario,
         'Evento': sale.nomeEvento,
@@ -117,7 +117,9 @@ const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard,
       })
     );
 
-    doc.autoTable({
+    // FIX: Cast doc to 'any' to use the autoTable plugin method, which is not
+    // recognized by the default jsPDF type definitions.
+    (doc as any).autoTable({
       head: [tableColumn],
       body: tableRows,
       startY: 20,
@@ -129,7 +131,7 @@ const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard,
         // 'Email': { cellWidth: 30 },
         // 'Produtos': { cellWidth: 50 },
       },
-      didParseCell: function (data) { // Ensure text fits, especially for header
+      didParseCell: function (data: any) { // Ensure text fits, especially for header
         if (data.row.section === 'head') {
             if (data.column.dataKey === 'Primeiro Nome Cliente') data.cell.text = 'P. Nome';
             if (data.column.dataKey === 'Sobrenome Cliente') data.cell.text = 'Sobrenome';
@@ -213,16 +215,25 @@ const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard,
             </tr>
           </thead>
           <tbody className="bg-slate-800 divide-y divide-gray-700">
-            {sales.slice().reverse().map((sale) => (
+            {sales.map((sale) => (
               <tr key={sale.id} className="hover:bg-slate-700/50 transition-colors duration-150">
                 <td className="px-2 py-4 whitespace-nowrap text-sm">
-                  <button 
-                    onClick={() => onEditSale(sale.id)} 
-                    className="text-primary-light hover:text-primary p-1 rounded hover:bg-slate-600"
-                    title="Editar Venda"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button 
+                      onClick={() => onEditSale(sale.id)} 
+                      className="text-primary-light hover:text-primary p-1 rounded hover:bg-slate-600"
+                      title="Editar Venda"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                    </button>
+                    <button 
+                      onClick={() => onDeleteSale(sale.id)} 
+                      className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-slate-600"
+                      title="Excluir Venda"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </div>
                 </td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.nomeUsuario}</td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.nomeEvento}</td>
