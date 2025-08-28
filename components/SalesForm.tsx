@@ -37,7 +37,8 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     currentUser, 
     currentEventName, 
     currentEventDate,
-    onGoBackToSetup
+    onGoBackToSetup,
+    onNotify
 }) => {
   const [formData, setFormData] = useState<SalesFormData>(initialFormState);
   const [selectedProducts, setSelectedProducts] = useState<ProdutoVenda[]>([]);
@@ -49,10 +50,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
   const [showNewPaymentMethodInput, setShowNewPaymentMethodInput] = useState<boolean>(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [cepLoading, setCepLoading] = useState(false);
-  const [dddError, setDddError] = useState<string | null>(null);
 
   const isEditing = !!editingSale;
 
@@ -76,7 +74,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         setShowNewPaymentMethodInput(false);
         setNewPaymentMethodName('');
       }
-      setDddError(null); // Clear DDD error when loading an existing sale
     } else {
       resetFormState(); // Ensure form is truly reset for new entries
     }
@@ -90,10 +87,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     setSelectedPaymentMethod('');
     setNewPaymentMethodName('');
     setShowNewPaymentMethodInput(false);
-    setSubmissionMessage(null);
-    setInfoMessage(null);
     setCepLoading(false);
-    setDddError(null);
   };
 
   const handleCancel = () => {
@@ -102,12 +96,11 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
   };
 
   const validateDDD = (dddValue: string): boolean => {
-    if (!/^\d{2}$/.test(dddValue)) {
-      setDddError('DDD deve conter 2 dígitos numéricos.');
-      return false;
+    const isValid = /^\d{2}$/.test(dddValue);
+    if (!isValid) {
+        onNotify({ type: 'error', text: 'DDD inválido. Deve conter exatamente 2 dígitos numéricos.' });
     }
-    setDddError(null);
-    return true;
+    return isValid;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -119,13 +112,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         ...prevData,
         [name]: numericValue,
       }));
-      if (numericValue.length === 2) {
-        validateDDD(numericValue);
-      } else if (numericValue.length > 0) {
-        setDddError('DDD deve conter 2 dígitos numéricos.');
-      } else {
-        setDddError(null);
-      }
     } else {
       setFormData(prevData => ({
         ...prevData,
@@ -135,7 +121,9 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
   };
 
   const handleDddBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    validateDDD(e.target.value);
+    if (e.target.value) { // Only validate if there is content
+        validateDDD(e.target.value);
+    }
   };
 
   const handlePaymentMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -181,9 +169,8 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
           cep: existingSale.cep,
           codCliente: existingSale.codCliente,
         }));
-        setInfoMessage("Dados do cliente preenchidos com base no CPF.");
-        setTimeout(() => setInfoMessage(null), 4000);
-        if (existingSale.ddd) validateDDD(existingSale.ddd); // Validate DDD on autofill
+        onNotify({ type: 'info', text: "Dados do cliente preenchidos com base no CPF." });
+        if (existingSale.ddd) validateDDD(existingSale.ddd);
       }
     }
   };
@@ -192,22 +179,14 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     const cep = e.target.value.replace(/\D/g, '');
     if (cep.length === 8) {
       setCepLoading(true);
-      setInfoMessage(null); 
       try {
         const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-        if (!response.ok) {
-          throw new Error('Falha ao buscar CEP. Verifique o número digitado.');
-        }
+        if (!response.ok) throw new Error('Falha ao buscar CEP. Verifique o número digitado.');
+        
         const data = await response.json();
         if (data.erro) {
-          setInfoMessage('CEP não encontrado ou inválido.');
-          setFormData(prev => ({
-            ...prev,
-            logradouroRua: '',
-            bairro: '',
-            cidade: '',
-            estado: '',
-          }));
+          onNotify({ type: 'info', text: 'CEP não encontrado ou inválido.' });
+          setFormData(prev => ({ ...prev, logradouroRua: '', bairro: '', cidade: '', estado: '' }));
         } else {
           setFormData(prev => ({
             ...prev,
@@ -216,28 +195,27 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
             cidade: data.localidade || '',
             estado: data.uf || '',
           }));
-          setInfoMessage('Endereço preenchido automaticamente pelo CEP.');
+          onNotify({ type: 'info', text: 'Endereço preenchido automaticamente pelo CEP.' });
         }
       } catch (error) {
         console.error("Erro ao buscar CEP:", error);
-        setInfoMessage(error instanceof Error ? error.message : 'Ocorreu um erro ao buscar o CEP.');
+        const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro ao buscar o CEP.';
+        onNotify({ type: 'error', text: errorMessage });
       } finally {
         setCepLoading(false);
-        setTimeout(() => setInfoMessage(null), 5000);
       }
     } else if (cep.length > 0) {
-      setInfoMessage('CEP incompleto. Digite 8 números.');
-      setTimeout(() => setInfoMessage(null), 3000);
+      onNotify({ type: 'info', text: 'CEP incompleto. Digite 8 números.' });
     }
   };
 
   const handleAddProduct = () => {
-    if (!currentProduct || (typeof currentUnits === 'string' ? parseInt(currentUnits, 10) : currentUnits) <= 0) {
-      setSubmissionMessage('Selecione um produto e insira uma quantidade válida.');
-      setTimeout(() => setSubmissionMessage(null), 3000);
+    const units = typeof currentUnits === 'string' ? parseInt(currentUnits, 10) : currentUnits;
+    if (!currentProduct || isNaN(units) || units <= 0) {
+      onNotify({ type: 'error', text: 'Selecione um produto e insira uma quantidade válida (maior que 0).' });
       return;
     }
-    const units = typeof currentUnits === 'string' ? parseInt(currentUnits, 10) : currentUnits;
+
     setSelectedProducts(prev => {
         const existingProductIndex = prev.findIndex(p => p.nomeProduto === currentProduct);
         if (existingProductIndex > -1) {
@@ -257,18 +235,15 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
     if (!validateDDD(formData.ddd)) {
       setIsSubmitting(false);
       return;
     }
 
-    setIsSubmitting(true);
-    setSubmissionMessage(null);
-    setInfoMessage(null);
-
     if (selectedProducts.length === 0) {
-        setSubmissionMessage('Adicione pelo menos um produto à venda.');
+        onNotify({ type: 'error', text: 'Adicione pelo menos um produto à venda.' });
         setIsSubmitting(false);
         return;
     }
@@ -276,21 +251,11 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     const finalPaymentMethod = showNewPaymentMethodInput ? newPaymentMethodName.trim() : selectedPaymentMethod;
 
     if (!finalPaymentMethod) {
-        if (isEditing && editingSale && editingSale.formaPagamento && showNewPaymentMethodInput && !newPaymentMethodName.trim()) {
-             setSubmissionMessage('A nova forma de pagamento não pode estar vazia.');
-        } else if (!isEditing || (isEditing && !editingSale?.formaPagamento)) {
-            setSubmissionMessage('Selecione ou cadastre uma forma de pagamento.');
-        }
-         if (isSubmitting) setIsSubmitting(false);
-         if (!finalPaymentMethod && (!isEditing || !editingSale?.formaPagamento) ) {
-            setIsSubmitting(false);
-            return;
-         }
+        onNotify({ type: 'error', text: 'Selecione ou cadastre uma forma de pagamento.' });
+        setIsSubmitting(false);
+        return;
     }
 
-    // FIX: Add created_at to satisfy the SalesData type.
-    // For new sales, a new ISO string is generated.
-    // For existing sales, the original created_at is preserved.
     const salePayload: SalesData = {
       ...formData,
       id: isEditing && editingSale ? editingSale.id : '',
@@ -302,17 +267,12 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
       produtos: selectedProducts,
     };
 
-    await new Promise(resolve => setTimeout(resolve, 700)); 
+    await onSaveSale(salePayload, isEditing);
 
-    onSaveSale(salePayload, isEditing);
-
-    setSubmissionMessage(isEditing ? 'Venda atualizada com sucesso!' : 'Venda registrada com sucesso!');
     if (!isEditing) {
         resetFormState(); 
     }
     setIsSubmitting(false);
-
-    setTimeout(() => setSubmissionMessage(null), 5000);
   };
 
   return (
@@ -336,16 +296,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         <p><strong className="font-medium text-gray-300">Data do Evento:</strong> {currentEventDate ? new Date(currentEventDate + 'T00:00:00').toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'N/A'}</p>
       </div>
 
-      {submissionMessage && (
-        <div className={`p-3 mb-4 rounded-md text-xs ${submissionMessage.includes('sucesso') ? 'bg-green-600 text-white' : 'bg-red-500 text-white'}`}>
-          {submissionMessage}
-        </div>
-      )}
-      {infoMessage && (
-        <div className={`p-3 mb-4 rounded-md text-xs ${infoMessage.includes('preenchido') || infoMessage.includes('sucesso') ? 'bg-blue-500 text-white' : 'bg-yellow-500 text-black'}`}>
-          {infoMessage}
-        </div>
-      )}
       {cepLoading && (
         <div className="p-3 mb-4 rounded-md text-xs bg-sky-500 text-white flex items-center">
             <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -355,12 +305,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
             Buscando CEP...
         </div>
       )}
-      {dddError && (
-        <div className="p-3 mb-4 rounded-md text-xs bg-red-500 text-white">
-          {dddError}
-        </div>
-      )}
-
 
       <form onSubmit={handleSubmit} className="space-y-1">
         <h3 className="text-xl font-semibold text-gray-200 pt-4 pb-2 border-b border-slate-700">Dados do Cliente</h3>
@@ -375,15 +319,15 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
             label="DDD" 
             id="ddd" 
             name="ddd" 
-            type="text" // Keep as text to control input precisely
+            type="text"
             value={formData.ddd} 
             onChange={handleChange} 
             onBlur={handleDddBlur}
             placeholder="Ex: 11" 
             required 
             Icon={PhoneIcon} 
-            maxLength={2} // Corrected maxLength to 2
-            pattern="\d{2}" // HTML5 pattern for basic validation
+            maxLength={2}
+            pattern="\d{2}"
           />
           <InputField label="Telefone" id="telefoneNumero" name="telefoneNumero" type="text" value={formData.telefoneNumero} onChange={handleChange} placeholder="Ex: 90000-0000" required Icon={PhoneIcon} className="md:col-span-2"/>
         </div>
@@ -442,8 +386,8 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
 
         <h4 className="text-lg font-medium text-gray-200 pt-4">Produtos</h4>
         <div className="space-y-4 p-4 bg-slate-700/50 rounded-md">
-            <div className="flex items-end space-x-4">
-                <div className="flex-grow">
+            <div className="flex justify-center items-end space-x-4">
+                <div className="w-full max-w-sm">
                     <label htmlFor="produto" className="block text-sm font-medium text-gray-300 mb-1">Produto</label>
                     <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
@@ -463,7 +407,18 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
                     </div>
                 </div>
                 <div className="w-24">
-                     <InputField label="Unid." id="unidades" name="unidades" type="number" value={currentUnits} onChange={(e) => setCurrentUnits(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value,10)))} min={1}/>
+                     <InputField label="Unid." id="unidades" name="unidades" type="number" value={currentUnits} 
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '') {
+                                setCurrentUnits('');
+                            } else {
+                                const num = parseInt(val, 10);
+                                setCurrentUnits(isNaN(num) ? '' : Math.max(1, num));
+                            }
+                        }}
+                        min={1}
+                     />
                 </div>
                 <button
                     type="button"
@@ -498,7 +453,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         <div className="flex flex-col sm:flex-row gap-4 pt-6">
             <button
             type="submit"
-            disabled={isSubmitting || cepLoading || !!dddError}
+            disabled={isSubmitting || cepLoading}
             className="w-full sm:w-auto flex-grow bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
             aria-live="polite"
             >

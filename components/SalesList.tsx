@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable'; // Import for the autoTable plugin
 
-const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard, onEditSale, onDeleteSale }) => {
+const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard, onEditSale, onDeleteSale, onNotify }) => {
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
@@ -74,11 +74,11 @@ const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard,
   };
 
   const handleDownloadExcel = () => {
-    const dataForExcel = getExportData('excel');
-    if (dataForExcel.length === 0) {
-      alert("Não há dados para exportar em Excel.");
+    if (sales.length === 0) {
+      onNotify({ type: 'info', text: "Não há dados para exportar em Excel." });
       return;
     }
+    const dataForExcel = getExportData('excel');
     const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Vendas");
@@ -97,13 +97,12 @@ const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard,
   };
 
   const handleDownloadPdf = () => {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    const dataForPdf = getExportData('pdf');
-    
-    if (dataForPdf.length === 0) {
-      alert("Não há dados para exportar em PDF.");
+    if (sales.length === 0) {
+      onNotify({ type: 'info', text: "Não há dados para exportar em PDF." });
       return;
     }
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const dataForPdf = getExportData('pdf');
 
     doc.text("Relatório de Vendas - Taimin", 14, 15);
     doc.setFontSize(10);

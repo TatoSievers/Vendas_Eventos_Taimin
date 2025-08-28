@@ -4,7 +4,8 @@ import SalesForm from './components/SalesForm';
 import SalesList from './components/SalesList';
 import InitialSetupForm from './components/InitialSetupForm';
 import ManagerialDashboard from './components/ManagerialDashboard';
-import { SalesData, EventDetail, UserDetail, InitialSetupData, PaymentMethodDetail } from './types';
+import Lightbox from './components/Lightbox';
+import { SalesData, EventDetail, UserDetail, InitialSetupData, PaymentMethodDetail, LightboxMessage } from './types';
 import { supabase } from './lib/supabaseClient';
 
 type AppView = 'setup' | 'salesFormAndList' | 'dashboard';
@@ -19,6 +20,7 @@ const App: React.FC = () => {
   const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
 
   const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
+  const [lightboxMessage, setLightboxMessage] = useState<LightboxMessage | null>(null);
 
   // Load sales data from Supabase on initial mount
   useEffect(() => {
@@ -69,7 +71,7 @@ const App: React.FC = () => {
         
       } catch (error) {
         console.error("Error loading sales from Supabase:", error);
-        alert("Falha ao carregar os dados de vendas. Verifique sua conexão e tente recarregar a página.");
+        setLightboxMessage({ type: 'error', text: "Falha ao carregar os dados de vendas. Verifique sua conexão e tente recarregar a página." });
         setAllSales([]);
       } finally {
         setIsDataLoaded(true);
@@ -134,10 +136,10 @@ const App: React.FC = () => {
         setAllSales(prevSales => prevSales.map(sale =>
             sale.id === editingSaleId ? { ...sale, ...saleToUpdate, produtos: saleData.produtos } : sale
         ));
-
+        setLightboxMessage({ type: 'success', text: 'Venda atualizada com sucesso!' });
       } catch (error) {
         console.error("Error updating sale:", error);
-        alert("Ocorreu um erro ao atualizar a venda. Por favor, tente novamente.");
+        setLightboxMessage({ type: 'error', text: "Ocorreu um erro ao atualizar a venda. Por favor, tente novamente." });
       }
     } else {
       // CREATE logic
@@ -180,10 +182,10 @@ const App: React.FC = () => {
 
         const newSaleWithProducts = { ...insertedSale, produtos: saleData.produtos } as SalesData;
         setAllSales(prevSales => [newSaleWithProducts, ...prevSales]);
-
+        setLightboxMessage({ type: 'success', text: 'Venda registrada com sucesso!' });
       } catch (error) {
         console.error("Error creating sale:", error);
-        alert("Ocorreu um erro ao registrar a nova venda. Por favor, tente novamente.");
+        setLightboxMessage({ type: 'error', text: "Ocorreu um erro ao registrar a nova venda. Por favor, tente novamente." });
       }
     }
     setEditingSaleId(null);
@@ -200,9 +202,10 @@ const App: React.FC = () => {
 
       setAllSales(prevSales => prevSales.filter(sale => sale.id !== saleId));
       console.log(`Sale with ID ${saleId} deleted successfully.`);
+      setLightboxMessage({ type: 'success', text: 'Venda excluída com sucesso.' });
     } catch (error) {
       console.error("Error deleting sale:", error);
-      alert("Ocorreu um erro ao excluir a venda. Por favor, tente novamente.");
+      setLightboxMessage({ type: 'error', text: "Ocorreu um erro ao excluir a venda. Por favor, tente novamente." });
     }
   };
 
@@ -322,12 +325,14 @@ const App: React.FC = () => {
               currentEventName={currentEventName}
               currentEventDate={currentEventDate}
               onGoBackToSetup={navigateToSetup}
+              onNotify={setLightboxMessage}
             />
             <SalesList 
               sales={allSales} 
               onNavigateToDashboard={navigateToDashboard}
               onEditSale={handleSetEditingSale}
               onDeleteSale={handleDeleteSale}
+              onNotify={setLightboxMessage}
             />
           </>
         )}
@@ -336,6 +341,8 @@ const App: React.FC = () => {
           <ManagerialDashboard sales={allSales} onGoBack={navigateToSalesForm} />
         )}
       </main>
+
+      {lightboxMessage && <Lightbox message={lightboxMessage} onClose={() => setLightboxMessage(null)} />}
 
       <footer className="w-full text-center py-8 mt-auto">
         <p className="text-sm text-gray-400">&copy; {new Date().getFullYear()} Vendas Taimin. Todos os direitos reservados.</p>

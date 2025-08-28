@@ -91,6 +91,11 @@ export interface InitialSetupData {
   eventDate: string;
 }
 
+export interface LightboxMessage {
+  type: 'success' | 'error' | 'info';
+  text: string;
+}
+
 export interface SalesFormProps {
   onSaveSale: (sale: SalesData, isEditing: boolean) => void;
   editingSale: SalesData | null;
@@ -102,6 +107,7 @@ export interface SalesFormProps {
   currentEventName: string;
   currentEventDate: string;
   onGoBackToSetup: () => void;
+  onNotify: (message: LightboxMessage) => void;
 }
 
 export interface SalesListProps {
@@ -109,4 +115,5 @@ export interface SalesListProps {
   onNavigateToDashboard: () => void;
   onEditSale: (saleId: string) => void;
   onDeleteSale: (saleId: string) => void;
+  onNotify: (message: LightboxMessage) => void;
 }
