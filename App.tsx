@@ -7,6 +7,7 @@ import ManagerialDashboard from './components/ManagerialDashboard';
 import Lightbox from './components/Lightbox';
 import { SalesData, EventDetail, UserDetail, InitialSetupData, PaymentMethodDetail, LightboxMessage } from './types';
 import { supabase } from './lib/supabaseClient';
+import { DEFAULT_USERS } from './constants';
 
 type AppView = 'setup' | 'salesFormAndList' | 'dashboard';
 
@@ -199,12 +200,15 @@ const App: React.FC = () => {
   }, [allSales]);
 
   const uniqueUsers = useMemo<UserDetail[]>(() => {
-    const userSet = new Set<string>();
+    // Start with the default users to ensure they are always present.
+    const userSet = new Set<string>(DEFAULT_USERS);
+    // Add users from sales records to the set (duplicates are handled by Set).
     allSales.forEach(sale => {
       if (sale.nomeUsuario) {
         userSet.add(sale.nomeUsuario);
       }
     });
+    // Convert the set to an array, map to the correct object structure, and sort alphabetically.
     const users = Array.from(userSet, (name) => ({ name }));
     users.sort((a, b) => a.name.localeCompare(b.name));
     return users;
