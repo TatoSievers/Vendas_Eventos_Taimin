@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vendas Taimin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              light: '#67e8f9', // cyan-300
+              DEFAULT: '#0891b2', // cyan-600
+              dark: '#0e7490', // cyan-700
+            },
+            secondary: {
+              light: '#f3f4f6', // gray-100
+              DEFAULT: '#e5e7eb', // gray-200
+              dark: '#d1d5db', // gray-300
+            }
+          }
+        }
+      }
+    }
+  </script>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "xlsx": "https://esm.sh/xlsx@0.18.5",
+    "chart.js/auto": "https://esm.sh/chart.js@4.4.1/auto",
+    "jspdf": "https://esm.sh/jspdf@2.5.1",
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.1",
+    "chart.js/": "https://esm.sh/chart.js@^4.5.0/"
+  }
+}
+</script>
+</head>
+<body class="bg-gray-100">
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
