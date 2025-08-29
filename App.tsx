@@ -92,15 +92,36 @@ const App: React.FC = () => {
   };
 
   const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
-    // Destructure to create a clean record for the 'sales' table, removing metadata.
-    const { id, created_at, produtos, ...saleRecord } = saleData;
+    // Explicitly build the record to submit to the 'sales' table.
+    // This prevents any extra properties (like 'produtos', 'id', etc.) from being sent.
+    const recordToSubmit = {
+      nomeUsuario: saleData.nomeUsuario,
+      nomeEvento: saleData.nomeEvento,
+      dataEvento: saleData.dataEvento,
+      primeiroNome: saleData.primeiroNome,
+      sobrenome: saleData.sobrenome,
+      cpf: saleData.cpf,
+      email: saleData.email,
+      ddd: saleData.ddd,
+      telefoneNumero: saleData.telefoneNumero,
+      logradouroRua: saleData.logradouroRua,
+      numeroEndereco: saleData.numeroEndereco,
+      complemento: saleData.complemento,
+      bairro: saleData.bairro,
+      cidade: saleData.cidade,
+      estado: saleData.estado,
+      cep: saleData.cep,
+      formaPagamento: saleData.formaPagamento,
+      observacao: saleData.observacao,
+      codCliente: saleData.codCliente,
+    };
 
     if (isEditing && editingSaleId) {
       // UPDATE logic
       try {
         const { error: saleUpdateError } = await supabase
           .from('sales')
-          .update(saleRecord)
+          .update(recordToSubmit)
           .eq('id', editingSaleId);
         if (saleUpdateError) throw saleUpdateError;
 
@@ -108,14 +129,14 @@ const App: React.FC = () => {
         const { error: productDeleteError } = await supabase.from('sale_products').delete().eq('sale_id', editingSaleId);
         if (productDeleteError) throw productDeleteError;
 
-        const productsToInsert = produtos.map(p => ({ sale_id: editingSaleId, nomeProduto: p.nomeProduto, unidades: p.unidades }));
+        const productsToInsert = saleData.produtos.map(p => ({ sale_id: editingSaleId, nomeProduto: p.nomeProduto, unidades: p.unidades }));
         if (productsToInsert.length > 0) {
             const { error: productInsertError } = await supabase.from('sale_products').insert(productsToInsert);
             if (productInsertError) throw productInsertError;
         }
 
         setAllSales(prevSales => prevSales.map(sale =>
-            sale.id === editingSaleId ? { ...sale, ...saleRecord, produtos: produtos } : sale
+            sale.id === editingSaleId ? { ...sale, ...recordToSubmit, produtos: saleData.produtos } : sale
         ));
         setLightboxMessage({ type: 'success', text: 'Venda atualizada com sucesso!' });
       } catch (error) {
@@ -127,18 +148,18 @@ const App: React.FC = () => {
       try {
         const { data: insertedSale, error: saleInsertError } = await supabase
           .from('sales')
-          .insert([saleRecord]) // FIX: Supabase insert expects an array of objects
+          .insert([recordToSubmit]) // Supabase insert expects an array of objects
           .select()
           .single();
         if (saleInsertError || !insertedSale) throw saleInsertError || new Error("Failed to get new sale ID");
 
-        const productsToInsert = produtos.map(p => ({ sale_id: insertedSale.id, nomeProduto: p.nomeProduto, unidades: p.unidades }));
+        const productsToInsert = saleData.produtos.map(p => ({ sale_id: insertedSale.id, nomeProduto: p.nomeProduto, unidades: p.unidades }));
          if (productsToInsert.length > 0) {
             const { error: productInsertError } = await supabase.from('sale_products').insert(productsToInsert);
             if (productInsertError) throw productInsertError;
         }
 
-        const newSaleWithProducts = { ...insertedSale, produtos: produtos } as SalesData;
+        const newSaleWithProducts = { ...insertedSale, produtos: saleData.produtos } as SalesData;
         setAllSales(prevSales => [newSaleWithProducts, ...prevSales]);
         setLightboxMessage({ type: 'success', text: 'Venda registrada com sucesso!' });
       } catch (error) {
