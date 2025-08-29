@@ -2,8 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { SalesData, SalesFormData, ProdutoVenda, SalesFormProps as SalesFormPropsType } from '../types';
 import InputField from './InputField';
-import TextAreaField from './TextAreaField';
-import { UserIcon, IdCardIcon, EmailIcon, PhoneIcon, MapPinIcon, CodeBracketIcon, DocumentTextIcon, CreditCardIcon, CubeIcon, PlusCircleIcon, TrashIcon, BuildingOfficeIcon, ArrowUturnLeftIcon } from './icons';
+import { UserIcon, IdCardIcon, EmailIcon, PhoneIcon, MapPinIcon, CreditCardIcon, CubeIcon, PlusCircleIcon, TrashIcon, BuildingOfficeIcon, ArrowUturnLeftIcon } from './icons';
 import { PRODUTOS_TAIMIN } from '../constants';
 
 const ADD_NEW_SENTINEL = "ADD_NEW_SENTINEL_VALUE";
@@ -23,8 +22,6 @@ const initialFormState: SalesFormData = {
   estado: '',
   cep: '',
   formaPagamento: '',
-  observacao: '',
-  codCliente: '',
 };
 
 const SalesForm: React.FC<SalesFormPropsType> = ({ 
@@ -167,7 +164,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
           cidade: existingSale.cidade,
           estado: existingSale.estado,
           cep: existingSale.cep,
-          codCliente: existingSale.codCliente,
         }));
         onNotify({ type: 'info', text: "Dados do cliente preenchidos com base no CPF." });
         if (existingSale.ddd) validateDDD(existingSale.ddd);
@@ -450,10 +446,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
                 </div>
             )}
         </div>
-
-        <h3 className="text-xl font-semibold text-gray-200 pt-4 pb-2 border-b border-slate-700">Outras Informações</h3>
-        <InputField label="Código do Cliente" id="codCliente" name="codCliente" type="text" value={formData.codCliente || ''} onChange={handleChange} placeholder="Ex: A05271" Icon={CodeBracketIcon}/>
-        <TextAreaField label="Observação" id="observacao" name="observacao" value={formData.observacao || ''} onChange={handleChange} placeholder="Alguma observação relevante..." rows={3} Icon={DocumentTextIcon}/>
 
         <div className="flex flex-col sm:flex-row gap-4 pt-6">
             <button

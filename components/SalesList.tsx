@@ -45,8 +45,6 @@ const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard,
         'CEP': sale.cep,
         'Forma de Pagamento': sale.formaPagamento,
         // Product data handled below based on exportType
-        'Cód. Cliente': sale.codCliente || '-',
-        'Observação': sale.observacao || '-',
       };
 
       if (exportType === 'excel') {
@@ -139,7 +137,6 @@ const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard,
             if (data.column.dataKey === 'Complemento End.') data.cell.text = 'Compl.';
             if (data.column.dataKey === 'Forma de Pagamento') data.cell.text = 'Pagamento';
             if (data.column.dataKey === 'Data Evento') data.cell.text = 'Dt. Evento';
-            if (data.column.dataKey === 'Cód. Cliente') data.cell.text = 'Cód. Cli.';
         }
       }
     });
@@ -208,8 +205,6 @@ const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard,
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">CEP</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40">Forma Pagamento</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-64">Produtos</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">Cód. Cliente</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-48">Observação</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-48">Email</th>
             </tr>
           </thead>
@@ -247,11 +242,9 @@ const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard,
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.bairro}</td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.cidade}</td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200">{sale.estado}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200">{sale.cep}</td>
+                <td className="px-3 py-4 whitespace-now-rap text-sm text-gray-200">{sale.cep}</td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.formaPagamento}</td>
                 <td className="px-3 py-4 text-sm text-gray-200 whitespace-pre-wrap break-words">{formatProductsForPdf(sale.produtos)}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200">{sale.codCliente || '-'}</td>
-                <td className="px-3 py-4 text-sm text-gray-200 whitespace-pre-wrap break-words">{sale.observacao || '-'}</td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.email}</td>
               </tr>
             ))}

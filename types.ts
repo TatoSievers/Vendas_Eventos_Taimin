@@ -29,9 +29,6 @@ export interface SalesData {
   formaPagamento: string;
   
   produtos: ProdutoVenda[];
-  
-  observacao: string | null;
-  codCliente: string | null;
 }
 
 // For fields that are part of SalesData but might be handled differently in forms

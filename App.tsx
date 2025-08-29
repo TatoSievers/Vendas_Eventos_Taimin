@@ -112,8 +112,6 @@ const App: React.FC = () => {
       estado: saleData.estado,
       cep: saleData.cep,
       formaPagamento: saleData.formaPagamento,
-      observacao: saleData.observacao,
-      codCliente: saleData.codCliente,
     };
 
     if (isEditing && editingSaleId) {
