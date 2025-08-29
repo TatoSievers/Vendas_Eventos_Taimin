@@ -1,148 +1,105 @@
 
-import React from 'react';
-import { SalesData, ProdutoVenda, SalesListProps as SalesListPropsType } from '../types';
-import { DownloadIcon, ChartBarIcon, PencilIcon, TrashIcon } from './icons';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable'; // Import for the autoTable plugin
 
-const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard, onEditSale, onDeleteSale, onNotify }) => {
+import React, { useState, useMemo } from 'react';
+// FIX: Removed unused and undefined 'ProdutoVenda' from import.
+import { SalesData } from '../types';
+import { 
+    DownloadIcon, 
+    ChartBarIcon, 
+    PencilIcon, 
+    TrashIcon, 
+    UserIcon,
+    TagIcon,
+    CalendarDaysIcon,
+    CubeIcon,
+    CreditCardIcon,
+    ChevronDownIcon,
+    MapPinIcon
+} from './icons';
+import * as XLSX from 'xlsx';
+
+// Props permanecem as mesmas
+interface SalesListProps {
+  sales: SalesData[];
+  onNavigateToDashboard: () => void;
+  onEditSale: (saleId: string) => void;
+  onDeleteSale: (saleId: string) => void;
+  onNotify: (message: { type: 'success' | 'error' | 'info'; text: string; }) => void;
+}
+
+const SalesList: React.FC<SalesListProps> = ({ sales, onNavigateToDashboard, onEditSale, onDeleteSale, onNotify }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterEvent, setFilterEvent] = useState('');
+  const [filterUser, setFilterUser] = useState('');
+
+  const uniqueEvents = useMemo(() => Array.from(new Set(sales.map(s => s.nomeEvento))).sort(), [sales]);
+  const uniqueUsers = useMemo(() => Array.from(new Set(sales.map(s => s.nomeUsuario))).sort(), [sales]);
+  
+  const filteredSales = useMemo(() => {
+    return sales.filter(sale => {
+      const searchTermLower = searchTerm.toLowerCase();
+      const matchesSearch = searchTerm ? 
+        sale.primeiroNome.toLowerCase().includes(searchTermLower) ||
+        sale.sobrenome.toLowerCase().includes(searchTermLower) ||
+        sale.cpf.includes(searchTermLower) ||
+        sale.nomeEvento.toLowerCase().includes(searchTermLower)
+        : true;
+      
+      const matchesEvent = filterEvent ? sale.nomeEvento === filterEvent : true;
+      const matchesUser = filterUser ? sale.nomeUsuario === filterUser : true;
+
+      return matchesSearch && matchesEvent && matchesUser;
+    });
+  }, [sales, searchTerm, filterEvent, filterUser]);
+  
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
-    return date.toLocaleDateString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' });
+    return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
   };
-
-  const formatProductsForPdf = (products: ProdutoVenda[] | undefined) => {
-    if (!products || products.length === 0) return '-';
-    return products.map(p => `${p.nomeProduto} (${p.unidades})`).join(', ');
-  };
-
+  
   const formatTelefone = (ddd: string | undefined, numero: string | undefined) => {
     if (!ddd && !numero) return 'N/A';
     return `(${ddd || ''}) ${numero || ''}`.trim();
   };
 
-  const getExportData = (exportType: 'excel' | 'pdf') => {
-    const MAX_PRODUCTS_COLUMNS_EXCEL = 5; // Max product pairs (Name, Units) for Excel
-
-    return sales.map(sale => {
-      const baseSaleData: { [key: string]: any } = {
-        'Usuário': sale.nomeUsuario,
-        'Evento': sale.nomeEvento,
-        'Data Evento': formatDate(sale.dataEvento),
-        'Primeiro Nome Cliente': sale.primeiroNome,
-        'Sobrenome Cliente': sale.sobrenome,
-        'CPF': sale.cpf,
-        'Email': sale.email,
-        'Telefone': formatTelefone(sale.ddd, sale.telefoneNumero),
-        'Logradouro (Rua)': sale.logradouroRua,
-        'Número End.': sale.numeroEndereco,
-        'Complemento End.': sale.complemento || '-',
-        'Bairro': sale.bairro,
-        'Cidade': sale.cidade,
-        'Estado': sale.estado,
-        'CEP': sale.cep,
-        'Forma de Pagamento': sale.formaPagamento,
-        // Product data handled below based on exportType
-      };
-
-      if (exportType === 'excel') {
-        const productExcelData: { [key: string]: any } = {};
-        for (let i = 0; i < MAX_PRODUCTS_COLUMNS_EXCEL; i++) {
-          productExcelData[`Produto ${i + 1}`] = (sale.produtos && sale.produtos[i]) ? sale.produtos[i].nomeProduto : '';
-          productExcelData[`Unidades Prod. ${i + 1}`] = (sale.produtos && sale.produtos[i]) ? sale.produtos[i].unidades : '';
-        }
-        if (sale.produtos && sale.produtos.length > MAX_PRODUCTS_COLUMNS_EXCEL) {
-          productExcelData['Produtos Adicionais'] = sale.produtos
-            .slice(MAX_PRODUCTS_COLUMNS_EXCEL)
-            .map(p => `${p.nomeProduto} (${p.unidades})`)
-            .join('; ');
-        } else {
-          productExcelData['Produtos Adicionais'] = '';
-        }
-        return { ...baseSaleData, ...productExcelData };
-      } else { // PDF
-        return {
-          ...baseSaleData,
-          'Produtos': formatProductsForPdf(sale.produtos),
-        };
-      }
-    });
-  };
-
   const handleDownloadExcel = () => {
     if (sales.length === 0) {
-      onNotify({ type: 'info', text: "Não há dados para exportar em Excel." });
+      onNotify({ type: 'info', text: "Não há dados para exportar." });
       return;
     }
-    const dataForExcel = getExportData('excel');
+    const dataForExcel = sales.map(sale => {
+        const productString = sale.produtos.map(p => `${p.nomeProduto} (${p.unidades} unid.)`).join('; ');
+        return {
+            'ID': sale.id,
+            'Data Criação': new Date(sale.created_at).toLocaleString('pt-BR'),
+            'Usuário': sale.nomeUsuario,
+            'Evento': sale.nomeEvento,
+            'Data Evento': formatDate(sale.dataEvento),
+            'Primeiro Nome': sale.primeiroNome,
+            'Sobrenome': sale.sobrenome,
+            'CPF': sale.cpf,
+            'Email': sale.email,
+            'Telefone': formatTelefone(sale.ddd, sale.telefoneNumero),
+            'Endereço': `${sale.logradouroRua}, ${sale.numeroEndereco}`,
+            'Complemento': sale.complemento || '-',
+            'Bairro': sale.bairro,
+            'Cidade': sale.cidade,
+            'Estado': sale.estado,
+            'CEP': sale.cep,
+            'Forma de Pagamento': sale.formaPagamento,
+            'Produtos': productString,
+            'Observação': sale.observacao || '-',
+        };
+    });
+
     const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Vendas");
-
-    // Calculate column widths
-    const colsWidth = Object.keys(dataForExcel[0] || {}).map(key => {
-        const maxLength = Math.max(
-            ...dataForExcel.map(row => (row[key] ?? '').toString().length),
-            key.length 
-        );
-        return { wch: maxLength + 2 }; // +2 for a little padding
-    });
+    const colsWidth = Object.keys(dataForExcel[0] || {}).map(key => ({ wch: Math.max(key.length, 20) }));
     worksheet["!cols"] = colsWidth;
-    
-    XLSX.writeFile(workbook, "Vendas_Taimin_Registros.xlsx");
+    XLSX.writeFile(workbook, "Vendas_Taimin_Completo.xlsx");
   };
-
-  const handleDownloadPdf = () => {
-    if (sales.length === 0) {
-      onNotify({ type: 'info', text: "Não há dados para exportar em PDF." });
-      return;
-    }
-    const doc = new jsPDF({ orientation: 'landscape' });
-    const dataForPdf = getExportData('pdf');
-
-    doc.text("Relatório de Vendas - Taimin", 14, 15);
-    doc.setFontSize(10);
-
-    const tableColumn = Object.keys(dataForPdf[0]);
-    // Ensure all row values are strings for jspdf-autotable, handling potential null/undefined
-    const tableRows = dataForPdf.map(row => 
-      tableColumn.map(colName => {
-        const value = row[colName];
-        return value !== null && value !== undefined ? String(value) : '';
-      })
-    );
-
-    // FIX: Cast doc to 'any' to use the autoTable plugin method, which is not
-    // recognized by the default jsPDF type definitions.
-    (doc as any).autoTable({
-      head: [tableColumn],
-      body: tableRows,
-      startY: 20,
-      theme: 'grid',
-      styles: { fontSize: 6, cellPadding: 1, overflow: 'linebreak' }, // Reduced font size for more columns
-      headStyles: { fillColor: [22, 160, 133], fontSize: 6.5, fontStyle: 'bold' },
-      columnStyles: {
-         // Example: Adjust specific column widths if needed
-        // 'Email': { cellWidth: 30 },
-        // 'Produtos': { cellWidth: 50 },
-      },
-      didParseCell: function (data: any) { // Ensure text fits, especially for header
-        if (data.row.section === 'head') {
-            if (data.column.dataKey === 'Primeiro Nome Cliente') data.cell.text = 'P. Nome';
-            if (data.column.dataKey === 'Sobrenome Cliente') data.cell.text = 'Sobrenome';
-            if (data.column.dataKey === 'Logradouro (Rua)') data.cell.text = 'Logradouro';
-            if (data.column.dataKey === 'Número End.') data.cell.text = 'Nº';
-            if (data.column.dataKey === 'Complemento End.') data.cell.text = 'Compl.';
-            if (data.column.dataKey === 'Forma de Pagamento') data.cell.text = 'Pagamento';
-            if (data.column.dataKey === 'Data Evento') data.cell.text = 'Dt. Evento';
-        }
-      }
-    });
-    doc.save("Vendas_Taimin_Registros.pdf");
-  };
-
 
   if (sales.length === 0) {
     return (
@@ -154,103 +111,100 @@ const SalesList: React.FC<SalesListPropsType> = ({ sales, onNavigateToDashboard,
   }
 
   return (
-    <div className="w-full max-w-full xl:max-w-7xl bg-slate-800 p-4 md:p-8 rounded-xl shadow-2xl">
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 md:mb-8">
-        <h2 className="text-2xl md:text-3xl font-semibold text-white text-center sm:text-left mb-4 sm:mb-0">Registros de Vendas</h2>
-        <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
-            <button
-              onClick={handleDownloadExcel}
-              className="bg-primary hover:bg-primary-dark text-white font-semibold py-2 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-primary-light focus:ring-opacity-50 transition duration-150 ease-in-out flex items-center justify-center space-x-2"
-              aria-label="Baixar relatório de vendas em formato Excel"
-            >
-              <DownloadIcon className="h-5 w-5" />
-              <span>Baixar Excel</span>
-            </button>
-            <button
-              onClick={handleDownloadPdf}
-              className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 transition duration-150 ease-in-out flex items-center justify-center space-x-2"
-              aria-label="Baixar relatório de vendas em formato PDF"
-            >
-              <DownloadIcon className="h-5 w-5" />
-              <span>Baixar PDF</span>
-            </button>
-            <button
-              onClick={onNavigateToDashboard}
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-150 ease-in-out flex items-center justify-center space-x-2"
-              aria-label="Ver relatório gerencial"
-            >
-              <ChartBarIcon className="h-5 w-5" />
-              <span>Relatório Gerencial</span>
-            </button>
+    <div className="w-full max-w-7xl bg-slate-800 p-4 md:p-8 rounded-xl shadow-2xl">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 md:mb-8 gap-4">
+        <h2 className="text-2xl md:text-3xl font-semibold text-white text-center md:text-left">Registros de Vendas</h2>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={handleDownloadExcel}
+            className="bg-primary hover:bg-primary-dark text-white font-semibold py-2 px-4 rounded-md shadow-md flex items-center justify-center space-x-2"
+          >
+            <DownloadIcon className="h-5 w-5" />
+            <span>Baixar Excel</span>
+          </button>
+          <button
+            onClick={onNavigateToDashboard}
+            className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md shadow-md flex items-center justify-center space-x-2"
+          >
+            <ChartBarIcon className="h-5 w-5" />
+            <span>Relatório Gerencial</span>
+          </button>
         </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-700 table-fixed">
-          <thead className="bg-slate-700">
-            <tr>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">Ações</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">Usuário</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40">Evento</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">Data Evento</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">Nome Cliente</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">Sobrenome Cliente</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">CPF</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">Telefone</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40">Logradouro</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-20">Número</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">Compl.</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">Bairro</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">Cidade</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-16">UF</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">CEP</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40">Forma Pagamento</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-64">Produtos</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-48">Email</th>
-            </tr>
-          </thead>
-          <tbody className="bg-slate-800 divide-y divide-gray-700">
-            {sales.map((sale) => (
-              <tr key={sale.id} className="hover:bg-slate-700/50 transition-colors duration-150">
-                <td className="px-2 py-4 whitespace-nowrap text-sm">
-                  <div className="flex items-center space-x-2">
-                    <button 
-                      onClick={() => onEditSale(sale.id)} 
-                      className="text-primary-light hover:text-primary p-1 rounded hover:bg-slate-600"
-                      title="Editar Venda"
-                    >
-                      <PencilIcon className="h-4 w-4" />
-                    </button>
-                    <button 
-                      onClick={() => onDeleteSale(sale.id)} 
-                      className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-slate-600"
-                      title="Excluir Venda"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.nomeUsuario}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.nomeEvento}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200">{formatDate(sale.dataEvento)}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.primeiroNome}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.sobrenome}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200">{sale.cpf}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200">{formatTelefone(sale.ddd, sale.telefoneNumero)}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.logradouroRua}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200">{sale.numeroEndereco}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.complemento || '-'}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.bairro}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.cidade}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200">{sale.estado}</td>
-                <td className="px-3 py-4 whitespace-now-rap text-sm text-gray-200">{sale.cep}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.formaPagamento}</td>
-                <td className="px-3 py-4 text-sm text-gray-200 whitespace-pre-wrap break-words">{formatProductsForPdf(sale.produtos)}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-200 truncate">{sale.email}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      {/* Filtros e Busca */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 bg-slate-700/50 rounded-lg">
+        <input
+          type="text"
+          placeholder="Buscar por cliente, CPF ou evento..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          className="w-full p-2 bg-slate-700 border border-slate-600 text-white rounded-md focus:ring-primary focus:border-primary"
+        />
+        <select value={filterEvent} onChange={e => setFilterEvent(e.target.value)} className="w-full p-2 bg-slate-700 border border-slate-600 text-white rounded-md focus:ring-primary focus:border-primary">
+          <option value="">Todos os Eventos</option>
+          {uniqueEvents.map(event => <option key={event} value={event}>{event}</option>)}
+        </select>
+        <select value={filterUser} onChange={e => setFilterUser(e.target.value)} className="w-full p-2 bg-slate-700 border border-slate-600 text-white rounded-md focus:ring-primary focus:border-primary">
+          <option value="">Todos os Usuários</option>
+          {uniqueUsers.map(user => <option key={user} value={user}>{user}</option>)}
+        </select>
       </div>
+
+      {/* Lista de Vendas em Cards */}
+      {filteredSales.length > 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filteredSales.map(sale => (
+            <div key={sale.id} className="bg-slate-700 rounded-lg shadow-lg flex flex-col transition-all duration-300 hover:shadow-primary/20 hover:ring-1 hover:ring-primary-dark">
+              <div className="p-5 flex-grow">
+                <div className="flex justify-between items-start">
+                  <h3 className="text-xl font-bold text-white mb-2">{sale.primeiroNome} {sale.sobrenome}</h3>
+                  <div className="flex items-center space-x-2">
+                    <button onClick={() => onEditSale(sale.id)} className="text-primary-light hover:text-primary p-1 rounded hover:bg-slate-600" title="Editar"><PencilIcon className="h-4 w-4" /></button>
+                    <button onClick={() => onDeleteSale(sale.id)} className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-slate-600" title="Excluir"><TrashIcon className="h-4 w-4" /></button>
+                  </div>
+                </div>
+                
+                <div className="space-y-3 text-sm text-gray-300">
+                    <p className="flex items-center"><TagIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.nomeEvento}</p>
+                    <p className="flex items-center"><CalendarDaysIcon className="h-4 w-4 mr-2 text-cyan-400"/> {formatDate(sale.dataEvento)}</p>
+                    <p className="flex items-center"><UserIcon className="h-4 w-4 mr-2 text-cyan-400"/> Vendedor(a): {sale.nomeUsuario}</p>
+                    <p className="flex items-center"><CreditCardIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.formaPagamento}</p>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-slate-600">
+                  <h4 className="font-semibold text-white mb-2 flex items-center"><CubeIcon className="h-4 w-4 mr-2"/> Produtos</h4>
+                  <ul className="list-disc list-inside text-sm text-gray-300 space-y-1">
+                    {sale.produtos.map(p => (
+                      <li key={p.nomeProduto}>{p.nomeProduto} ({p.unidades} unid.)</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <details className="group">
+                <summary className="p-3 bg-slate-600/50 cursor-pointer text-sm text-cyan-300 hover:bg-slate-600 flex justify-between items-center rounded-b-lg">
+                  Ver Detalhes
+                  <ChevronDownIcon className="h-5 w-5 transition-transform duration-300 group-open:rotate-180"/>
+                </summary>
+                <div className="p-5 bg-slate-700/50 border-t border-slate-600 rounded-b-lg text-sm text-gray-300 space-y-2">
+                    <p><strong>CPF:</strong> {sale.cpf}</p>
+                    <p><strong>Email:</strong> {sale.email}</p>
+                    <p><strong>Telefone:</strong> {formatTelefone(sale.ddd, sale.telefoneNumero)}</p>
+                    <p className="flex items-start"><MapPinIcon className="h-4 w-4 mr-2 mt-0.5 text-cyan-400 flex-shrink-0"/> 
+                        {sale.logradouroRua}, {sale.numeroEndereco} {sale.complemento ? `(${sale.complemento})` : ''} - {sale.bairro}, {sale.cidade} - {sale.estado}, {sale.cep}
+                    </p>
+                    {sale.observacao && <p><strong>Observação:</strong> {sale.observacao}</p>}
+                </div>
+              </details>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-10 text-gray-400">
+          <p>Nenhum registro encontrado com os filtros aplicados.</p>
+        </div>
+      )}
     </div>
   );
 };

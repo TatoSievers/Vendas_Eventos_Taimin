@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 // ... (todos os outros imports permanecem os mesmos)
-import { SalesData, ProdutoVenda, SalesFormProps as SalesFormPropsType } from '../types';
+// FIX: Changed ProdutoVenda to ProductDetail and imported SalesFormProps which is now defined in types.ts
+import { SalesData, ProductDetail, SalesFormProps as SalesFormPropsType } from '../types';
 import InputField from './InputField';
 import { UserIcon, IdCardIcon, EmailIcon, PhoneIcon, MapPinIcon, CreditCardIcon, CubeIcon, PlusCircleIcon, TrashIcon, BuildingOfficeIcon, ArrowUturnLeftIcon } from './icons';
 import { PRODUTOS_TAIMIN } from '../constants';
@@ -22,6 +24,8 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     onGoBackToSetup,
     onNotify
 }) => {
+  // FIX: Define ADD_NEW_SENTINEL at the component scope to be accessible everywhere within it.
+  const ADD_NEW_SENTINEL = "ADD_NEW_SENTINEL_VALUE";
   const getInitialFormState = (): SalesData => ({
     primeiroNome: '',
     sobrenome: '',
@@ -47,7 +51,8 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
   });
 
   const [formData, setFormData] = useState<SalesData>(getInitialFormState());
-  const [selectedProducts, setSelectedProducts] = useState<ProdutoVenda[]>([]);
+  // FIX: Changed state type from ProdutoVenda to ProductDetail to match the defined type.
+  const [selectedProducts, setSelectedProducts] = useState<ProductDetail[]>([]);
   const [currentProduct, setCurrentProduct] = useState<string>('');
   const [currentUnits, setCurrentUnits] = useState<number | string>(1);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
@@ -78,7 +83,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     } else {
       resetFormState();
     }
-  }, [editingSale, isEditing, uniquePaymentMethods]);
+  }, [editingSale, isEditing, uniquePaymentMethods, ADD_NEW_SENTINEL]);
 
   const resetFormState = () => {
     setFormData(getInitialFormState());
@@ -124,7 +129,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
 
   const handlePaymentMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
-    const ADD_NEW_SENTINEL = "ADD_NEW_SENTINEL_VALUE";
     if (value === ADD_NEW_SENTINEL) {
       setShowNewPaymentMethodInput(true);
       setSelectedPaymentMethod(ADD_NEW_SENTINEL); 
@@ -247,7 +251,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         setIsSubmitting(false);
         return;
     }
-    const ADD_NEW_SENTINEL = "ADD_NEW_SENTINEL_VALUE";
     const salePayload: SalesData = {
       ...formData,
       nomeUsuario: currentUser,
@@ -335,14 +338,14 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10"><CreditCardIcon className="h-5 w-5 text-gray-400" /></div>
             <select
               id="paymentMethodSelector"
-              value={showNewPaymentMethodInput ? "ADD_NEW_SENTINEL_VALUE" : selectedPaymentMethod}
+              value={showNewPaymentMethodInput ? ADD_NEW_SENTINEL : selectedPaymentMethod}
               onChange={handlePaymentMethodChange}
               required={!showNewPaymentMethodInput && !formData.formaPagamento}
               className="w-full p-3 pl-10 border border-gray-600 rounded-md shadow-sm bg-gray-700 text-white focus:ring-primary focus:border-primary"
             >
               <option value="">-- Selecione uma forma de pagamento --</option>
               {uniquePaymentMethods.map(pm => (<option key={pm.name} value={pm.name}>{pm.name}</option>))}
-              <option value="ADD_NEW_SENTINEL_VALUE">Cadastrar Nova...</option>
+              <option value={ADD_NEW_SENTINEL}>Cadastrar Nova...</option>
             </select>
           </div>
           {showNewPaymentMethodInput && (

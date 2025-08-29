@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import SalesForm from './components/SalesForm';
 import SalesList from './components/SalesList';
@@ -29,7 +30,10 @@ const App: React.FC = () => {
   const [lightboxMessage, setLightboxMessage] = useState<LightboxMessage | null>(null);
   
   // Pega a senha do arquivo de configuração .env
-  const appPassword = import.meta.env.VITE_APP_PASSWORD;
+  // FIX: Cast `import.meta` to `any` to access the `env` property. This bypasses
+  // the TypeScript error "Property 'env' does not exist on type 'ImportMeta'"
+  // when Vite's type definitions are not found.
+  const appPassword = (import.meta as any).env.VITE_APP_PASSWORD;
 
   // --- Efeito para Carregar os Dados ---
   // Roda apenas uma vez, quando o usuário for autenticado com sucesso.
@@ -307,7 +311,8 @@ const App: React.FC = () => {
           </>
         )}
         {currentView === 'dashboard' && (
-          <ManagerialDashboard sales={allSales} uniqueEvents={uniqueEvents} onGoBack={navigateToSalesForm} />
+          // FIX: Removed uniqueEvents prop as it is not defined in ManagerialDashboardProps.
+          <ManagerialDashboard sales={allSales} onGoBack={navigateToSalesForm} />
         )}
       </main>
       {lightboxMessage && <Lightbox message={lightboxMessage} onClose={() => setLightboxMessage(null)} />}
