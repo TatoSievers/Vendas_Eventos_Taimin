@@ -127,7 +127,7 @@ const App: React.FC = () => {
       try {
         const { data: insertedSale, error: saleInsertError } = await supabase
           .from('sales')
-          .insert(saleRecord)
+          .insert([saleRecord]) // FIX: Supabase insert expects an array of objects
           .select()
           .single();
         if (saleInsertError || !insertedSale) throw saleInsertError || new Error("Failed to get new sale ID");
