@@ -1,7 +1,6 @@
 
 
-import React, { useState, useMemo } from 'react';
-// FIX: Removed unused and undefined 'ProdutoVenda' from import.
+import React, { useMemo } from 'react';
 import { SalesData } from '../types';
 import { 
     DownloadIcon, 
@@ -18,39 +17,40 @@ import {
 } from './icons';
 import * as XLSX from 'xlsx';
 
-// Props permanecem as mesmas
 interface SalesListProps {
   sales: SalesData[];
+  allSalesForFilters: SalesData[];
   onNavigateToDashboard: () => void;
   onEditSale: (saleId: string) => void;
   onDeleteSale: (saleId: string) => void;
+  onDeleteEvent: (eventName: string) => void;
   onNotify: (message: { type: 'success' | 'error' | 'info'; text: string; }) => void;
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  filterEvent: string;
+  setFilterEvent: (event: string) => void;
+  filterUser: string;
+  setFilterUser: (user: string) => void;
 }
 
-const SalesList: React.FC<SalesListProps> = ({ sales, onNavigateToDashboard, onEditSale, onDeleteSale, onNotify }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterEvent, setFilterEvent] = useState('');
-  const [filterUser, setFilterUser] = useState('');
-
-  const uniqueEvents = useMemo(() => Array.from(new Set(sales.map(s => s.nomeEvento))).sort(), [sales]);
-  const uniqueUsers = useMemo(() => Array.from(new Set(sales.map(s => s.nomeUsuario))).sort(), [sales]);
+const SalesList: React.FC<SalesListProps> = ({ 
+    sales, 
+    allSalesForFilters,
+    onNavigateToDashboard, 
+    onEditSale, 
+    onDeleteSale, 
+    onDeleteEvent,
+    onNotify,
+    searchTerm,
+    setSearchTerm,
+    filterEvent,
+    setFilterEvent,
+    filterUser,
+    setFilterUser
+}) => {
   
-  const filteredSales = useMemo(() => {
-    return sales.filter(sale => {
-      const searchTermLower = searchTerm.toLowerCase();
-      const matchesSearch = searchTerm ? 
-        sale.primeiroNome.toLowerCase().includes(searchTermLower) ||
-        sale.sobrenome.toLowerCase().includes(searchTermLower) ||
-        sale.cpf.includes(searchTermLower) ||
-        sale.nomeEvento.toLowerCase().includes(searchTermLower)
-        : true;
-      
-      const matchesEvent = filterEvent ? sale.nomeEvento === filterEvent : true;
-      const matchesUser = filterUser ? sale.nomeUsuario === filterUser : true;
-
-      return matchesSearch && matchesEvent && matchesUser;
-    });
-  }, [sales, searchTerm, filterEvent, filterUser]);
+  const uniqueEvents = useMemo(() => Array.from(new Set(allSalesForFilters.map(s => s.nomeEvento))).sort(), [allSalesForFilters]);
+  const uniqueUsers = useMemo(() => Array.from(new Set(allSalesForFilters.map(s => s.nomeUsuario))).sort(), [allSalesForFilters]);
   
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'N/A';
@@ -65,7 +65,7 @@ const SalesList: React.FC<SalesListProps> = ({ sales, onNavigateToDashboard, onE
 
   const handleDownloadExcel = () => {
     if (sales.length === 0) {
-      onNotify({ type: 'info', text: "Não há dados para exportar." });
+      onNotify({ type: 'info', text: "Não há dados para exportar (com os filtros atuais)." });
       return;
     }
     const dataForExcel = sales.map(sale => {
@@ -98,10 +98,10 @@ const SalesList: React.FC<SalesListProps> = ({ sales, onNavigateToDashboard, onE
     XLSX.utils.book_append_sheet(workbook, worksheet, "Vendas");
     const colsWidth = Object.keys(dataForExcel[0] || {}).map(key => ({ wch: Math.max(key.length, 20) }));
     worksheet["!cols"] = colsWidth;
-    XLSX.writeFile(workbook, "Vendas_Taimin_Completo.xlsx");
+    XLSX.writeFile(workbook, "Vendas_Taimin_Filtrado.xlsx");
   };
 
-  if (sales.length === 0) {
+  if (allSalesForFilters.length === 0) {
     return (
       <div className="w-full max-w-4xl bg-slate-800 p-8 rounded-xl shadow-2xl text-center">
         <h2 className="text-3xl font-semibold text-white mb-6">Registros de Vendas</h2>
@@ -141,10 +141,17 @@ const SalesList: React.FC<SalesListProps> = ({ sales, onNavigateToDashboard, onE
           onChange={e => setSearchTerm(e.target.value)}
           className="w-full p-2 bg-slate-700 border border-slate-600 text-white rounded-md focus:ring-primary focus:border-primary"
         />
-        <select value={filterEvent} onChange={e => setFilterEvent(e.target.value)} className="w-full p-2 bg-slate-700 border border-slate-600 text-white rounded-md focus:ring-primary focus:border-primary">
-          <option value="">Todos os Eventos</option>
-          {uniqueEvents.map(event => <option key={event} value={event}>{event}</option>)}
-        </select>
+        <div className="flex items-center gap-2">
+            <select value={filterEvent} onChange={e => setFilterEvent(e.target.value)} className="w-full p-2 bg-slate-700 border border-slate-600 text-white rounded-md focus:ring-primary focus:border-primary">
+              <option value="">Todos os Eventos</option>
+              {uniqueEvents.map(event => <option key={event} value={event}>{event}</option>)}
+            </select>
+            {filterEvent && (
+              <button onClick={() => onDeleteEvent(filterEvent)} className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-md shrink-0" title={`Apagar evento ${filterEvent} e todas as suas vendas`}>
+                  <TrashIcon className="h-5 w-5" />
+              </button>
+            )}
+        </div>
         <select value={filterUser} onChange={e => setFilterUser(e.target.value)} className="w-full p-2 bg-slate-700 border border-slate-600 text-white rounded-md focus:ring-primary focus:border-primary">
           <option value="">Todos os Usuários</option>
           {uniqueUsers.map(user => <option key={user} value={user}>{user}</option>)}
@@ -152,9 +159,9 @@ const SalesList: React.FC<SalesListProps> = ({ sales, onNavigateToDashboard, onE
       </div>
 
       {/* Lista de Vendas em Cards */}
-      {filteredSales.length > 0 ? (
+      {sales.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredSales.map(sale => (
+          {sales.map(sale => (
             <div key={sale.id} className="bg-slate-700 rounded-lg shadow-lg flex flex-col transition-all duration-300 hover:shadow-primary/20 hover:ring-1 hover:ring-primary-dark">
               <div className="p-5 flex-grow">
                 <div className="flex justify-between items-start">

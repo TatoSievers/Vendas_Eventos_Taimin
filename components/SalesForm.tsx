@@ -1,15 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-// ... (todos os outros imports permanecem os mesmos)
-// FIX: Changed ProdutoVenda to ProductDetail and imported SalesFormProps which is now defined in types.ts
 import { SalesData, ProductDetail, SalesFormProps as SalesFormPropsType } from '../types';
 import InputField from './InputField';
-import { UserIcon, IdCardIcon, EmailIcon, PhoneIcon, MapPinIcon, CreditCardIcon, CubeIcon, PlusCircleIcon, TrashIcon, BuildingOfficeIcon, ArrowUturnLeftIcon } from './icons';
+import { UserIcon, IdCardIcon, EmailIcon, PhoneIcon, MapPinIcon, CreditCardIcon, CubeIcon, TrashIcon, BuildingOfficeIcon, ArrowUturnLeftIcon } from './icons';
 import { PRODUTOS_TAIMIN } from '../constants';
 
-
-// ... (todo o resto do seu componente permanece exatamente o mesmo até a seção de Produtos)
-// Apenas a seção do formulário é mostrada aqui para brevidade, mas você deve usar o código completo abaixo.
 
 const SalesForm: React.FC<SalesFormPropsType> = ({ 
     onSaveSale, 
@@ -24,7 +19,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     onGoBackToSetup,
     onNotify
 }) => {
-  // FIX: Define ADD_NEW_SENTINEL at the component scope to be accessible everywhere within it.
   const ADD_NEW_SENTINEL = "ADD_NEW_SENTINEL_VALUE";
   const getInitialFormState = (): SalesData => ({
     primeiroNome: '',
@@ -51,7 +45,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
   });
 
   const [formData, setFormData] = useState<SalesData>(getInitialFormState());
-  // FIX: Changed state type from ProdutoVenda to ProductDetail to match the defined type.
   const [selectedProducts, setSelectedProducts] = useState<ProductDetail[]>([]);
   const [currentProduct, setCurrentProduct] = useState<string>('');
   const [currentUnits, setCurrentUnits] = useState<number | string>(1);
@@ -64,9 +57,11 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
 
   useEffect(() => {
     if (isEditing && editingSale) {
-      const { produtos, ...editableData } = editingSale;
-      setFormData(editableData);
-      setSelectedProducts(produtos || []);
+      // FIX: The `...editableData` spread was missing the `produtos` property,
+      // which is required by the `SalesData` type. Pass the full `editingSale`
+      // object to `setFormData` and extract `produtos` for `setSelectedProducts`.
+      setFormData(editingSale);
+      setSelectedProducts(editingSale.produtos || []);
       
       const isExistingPM = uniquePaymentMethods.some(pm => pm.name === editingSale.formaPagamento);
       if (isExistingPM) {
@@ -96,7 +91,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     setCepLoading(false);
   };
   
-  // ... (todas as outras funções handleChange, handleSubmit, etc., continuam as mesmas)
     const handleCancel = () => {
     onCancelEdit(); 
     resetFormState(); 
@@ -356,11 +350,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         <h4 className="text-lg font-medium text-gray-200 pt-4">Produtos</h4>
         <div className="space-y-4 p-4 bg-slate-700/50 rounded-md">
             
-            {/* ================================================================= */}
-            {/* ======================= ÁREA CORRIGIDA ======================== */}
-            {/* ================================================================= */}
             <div className="flex items-end gap-4">
-                {/* Coluna do Seletor de Produto */}
                 <div className="flex-grow">
                     <label htmlFor="produto" className="block text-sm font-medium text-gray-300 mb-1">Produto</label>
                     <div className="relative">
@@ -381,8 +371,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
                     </div>
                 </div>
 
-                {/* Coluna do Campo de Unidades */}
-                <div className="shrink-0" style={{width: '6rem'}}> {/* Largura fixa de 96px */}
+                <div className="shrink-0" style={{width: '6rem'}}>
                      <InputField label="Unid." id="unidades" name="unidades" type="number" value={currentUnits} 
                         onChange={(e) => {
                             const val = e.target.value;
@@ -391,20 +380,17 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
                         min={1}
                      />
                 </div>
+            </div>
 
-                {/* Coluna do Botão de Adicionar */}
-                <div className="shrink-0">
-                    {/* Este label invisível ocupa o mesmo espaço que os outros labels, alinhando o botão abaixo dele */}
-                    <label className="block text-sm font-medium text-transparent mb-1 select-none">&nbsp;</label>
-                    <button
-                        type="button"
-                        onClick={handleAddProduct}
-                        className="bg-slate-600 hover:bg-slate-500 text-white font-semibold p-3 rounded-md shadow-md flex items-center justify-center h-full"
-                        title="Adicionar Produto"
-                    >
-                        <PlusCircleIcon className="h-5 w-5" />
-                    </button>
-                </div>
+            <div className="pt-2">
+                <button
+                    type="button"
+                    onClick={handleAddProduct}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold p-3 rounded-md shadow-md flex items-center justify-center"
+                    title="Adicionar Produto"
+                >
+                    Adicionar
+                </button>
             </div>
             
             {selectedProducts.length > 0 && (

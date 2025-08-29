@@ -8,12 +8,10 @@ import Lightbox from './components/Lightbox';
 import { SalesData, EventDetail, UserDetail, InitialSetupData, PaymentMethodDetail, LightboxMessage } from './types';
 import { supabase } from './lib/supabaseClient';
 import { DEFAULT_USERS } from './constants';
+import PasswordScreen from './components/PasswordScreen';
 
 type AppView = 'setup' | 'salesFormAndList' | 'dashboard';
 
-// =================================================================================
-// CÓDIGO CORRIGIDO E SIMPLIFICADO
-// =================================================================================
 const App: React.FC = () => {
   // --- Estados da Aplicação ---
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -21,24 +19,24 @@ const App: React.FC = () => {
   const [allSales, setAllSales] = useState<SalesData[]>([]);
   const [currentView, setCurrentView] = useState<AppView>('setup');
   
-  // Estados para o contexto da venda (usuário, evento, etc.)
+  // Estados para o contexto da venda
   const [currentUser, setCurrentUser] = useState<string>('');
   const [currentEventName, setCurrentEventName] = useState<string>('');
   const [currentEventDate, setCurrentEventDate] = useState<string>('');
   const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
 
+  // Estados de filtro (movidos para o nível do App)
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterEvent, setFilterEvent] = useState('');
+  const [filterUser, setFilterUser] = useState('');
+
   const [lightboxMessage, setLightboxMessage] = useState<LightboxMessage | null>(null);
   
-  // Pega a senha do arquivo de configuração .env
-  // FIX: Cast `import.meta` to `any` to access the `env` property. This bypasses
-  // the TypeScript error "Property 'env' does not exist on type 'ImportMeta'"
-  // when Vite's type definitions are not found.
   const appPassword = (import.meta as any).env.VITE_APP_PASSWORD;
 
   // --- Efeito para Carregar os Dados ---
-  // Roda apenas uma vez, quando o usuário for autenticado com sucesso.
   useEffect(() => {
-    if (!isAuthenticated) return; // Só carrega os dados se estiver autenticado
+    if (!isAuthenticated) return;
 
     const fetchSales = async () => {
       try {
@@ -80,19 +78,18 @@ const App: React.FC = () => {
         })) as SalesData[];
 
         setAllSales(formattedSales);
-        console.log(`Vendas Taimin: ${formattedSales.length} sales records loaded successfully.`);
         
       } catch (error) {
         console.error("Error loading sales from Supabase:", error);
         setLightboxMessage({ type: 'error', text: "Falha ao carregar os dados. Verifique a conexão." });
         setAllSales([]);
       } finally {
-        setIsDataLoaded(true); // Marca que os dados foram carregados (ou falharam ao carregar)
+        setIsDataLoaded(true);
       }
     };
 
     fetchSales();
-  }, [isAuthenticated]); // A dependência garante que rode quando `isAuthenticated` se torna `true`
+  }, [isAuthenticated]);
 
 
   // --- Funções de Manipulação de Dados ---
@@ -106,7 +103,6 @@ const App: React.FC = () => {
   };
 
   const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
-    // Lógica para salvar a venda (CREATE ou UPDATE)
     const recordToSubmit = {
       nomeUsuario: saleData.nomeUsuario,
       nomeEvento: saleData.nomeEvento,
@@ -125,7 +121,7 @@ const App: React.FC = () => {
       estado: saleData.estado,
       cep: saleData.cep,
       formaPagamento: saleData.formaPagamento,
-      observacao: saleData.observacao || null, // restaurado
+      observacao: saleData.observacao || null,
     };
 
     if (isEditing && editingSaleId) {
@@ -176,6 +172,25 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDeleteEvent = async (eventName: string) => {
+    const salesCount = allSales.filter(s => s.nomeEvento === eventName).length;
+    if (!window.confirm(`Tem certeza que deseja apagar o evento "${eventName}" e todas as suas ${salesCount} vendas associadas? Esta ação é irreversível.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('sales').delete().eq('nomeEvento', eventName);
+      if (error) throw error;
+
+      setAllSales(prev => prev.filter(s => s.nomeEvento !== eventName));
+      setFilterEvent(''); // Reseta o filtro
+      setLightboxMessage({ type: 'success', text: `Evento "${eventName}" e todas as suas vendas foram excluídos.` });
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      setLightboxMessage({ type: 'error', text: "Erro ao excluir o evento." });
+    }
+  };
+
   const handleSetEditingSale = (saleId: string | null) => {
     if (saleId) {
       const saleToEdit = allSales.find(sale => sale.id === saleId);
@@ -212,6 +227,23 @@ const App: React.FC = () => {
     return Array.from(paymentMethodSet, name => ({ name })).sort((a, b) => a.name.localeCompare(b.name));
   }, [allSales]);
   
+  const filteredSales = useMemo(() => {
+    return allSales.filter(sale => {
+      const searchTermLower = searchTerm.toLowerCase();
+      const matchesSearch = searchTerm ? 
+        sale.primeiroNome.toLowerCase().includes(searchTermLower) ||
+        sale.sobrenome.toLowerCase().includes(searchTermLower) ||
+        sale.cpf.includes(searchTermLower) ||
+        sale.nomeEvento.toLowerCase().includes(searchTermLower)
+        : true;
+      
+      const matchesEvent = filterEvent ? sale.nomeEvento === filterEvent : true;
+      const matchesUser = filterUser ? sale.nomeUsuario === filterUser : true;
+
+      return matchesSearch && matchesEvent && matchesUser;
+    });
+  }, [allSales, searchTerm, filterEvent, filterUser]);
+
   // --- Funções de Navegação ---
   const navigateToDashboard = () => setCurrentView('dashboard');
   const navigateToSalesForm = () => { setEditingSaleId(null); setCurrentView('salesFormAndList'); }
@@ -225,11 +257,8 @@ const App: React.FC = () => {
 
   const saleBeingEdited = editingSaleId ? allSales.find(s => s.id === editingSaleId) || null : null;
   
-  // =================================================================================
-  // LÓGICA DE RENDERIZAÇÃO ROBUSTA
-  // =================================================================================
+  // --- Lógica de Renderização ---
 
-  // 1. Verifica se a senha está configurada no ambiente. Se não, mostra erro.
   if (!appPassword) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 text-white">
@@ -241,48 +270,10 @@ const App: React.FC = () => {
     );
   }
 
-  // 2. Se não estiver autenticado, mostra a tela de senha.
   if (!isAuthenticated) {
-    const handlePasswordSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      const passwordInput = (e.target as HTMLFormElement).password.value;
-      if (passwordInput === appPassword) {
-        setIsAuthenticated(true); // Autentica com sucesso
-      } else {
-        alert("Senha incorreta!");
-      }
-    };
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900">
-        <div className="w-full max-w-sm">
-          <form onSubmit={handlePasswordSubmit} className="bg-slate-800 shadow-2xl rounded-lg px-8 pt-6 pb-8">
-            <h1 className="text-2xl text-white font-bold mb-6 text-center">Acesso Restrito</h1>
-            <div className="mb-4">
-              <label className="block text-gray-300 text-sm font-bold mb-2" htmlFor="password">
-                Senha
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-            <div className="flex items-center justify-center">
-              <button
-                type="submit"
-                className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition-colors"
-              >
-                Entrar
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
+    return <PasswordScreen onCorrectPassword={() => setIsAuthenticated(true)} appPassword={appPassword} />;
   }
   
-  // 3. Se estiver autenticado, mas os dados ainda não carregaram, mostra o loader.
   if (!isDataLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 text-white">
@@ -294,7 +285,6 @@ const App: React.FC = () => {
     );
   }
 
-  // 4. Se estiver autenticado e os dados carregados, mostra a aplicação principal.
   return (
     <div className="min-h-screen flex flex-col items-center p-4 bg-gradient-to-br from-slate-900 to-slate-700 text-gray-200">
       <header className="my-6 md:my-8 text-center w-full max-w-4xl">
@@ -307,12 +297,25 @@ const App: React.FC = () => {
         {currentView === 'salesFormAndList' && (
           <>
             <SalesForm onSaveSale={handleSaveSale} editingSale={saleBeingEdited} onCancelEdit={handleCancelEdit} uniqueEvents={uniqueEvents} uniquePaymentMethods={uniquePaymentMethods} allSales={allSales} currentUser={currentUser} currentEventName={currentEventName} currentEventDate={currentEventDate} onGoBackToSetup={navigateToSetup} onNotify={setLightboxMessage} />
-            <SalesList sales={allSales} onNavigateToDashboard={navigateToDashboard} onEditSale={handleSetEditingSale} onDeleteSale={handleDeleteSale} onNotify={setLightboxMessage} />
+            <SalesList 
+              sales={filteredSales}
+              allSalesForFilters={allSales}
+              onNavigateToDashboard={navigateToDashboard} 
+              onEditSale={handleSetEditingSale} 
+              onDeleteSale={handleDeleteSale}
+              onNotify={setLightboxMessage}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              filterEvent={filterEvent}
+              setFilterEvent={setFilterEvent}
+              filterUser={filterUser}
+              setFilterUser={setFilterUser}
+              onDeleteEvent={handleDeleteEvent}
+            />
           </>
         )}
         {currentView === 'dashboard' && (
-          // FIX: Removed uniqueEvents prop as it is not defined in ManagerialDashboardProps.
-          <ManagerialDashboard sales={allSales} onGoBack={navigateToSalesForm} />
+          <ManagerialDashboard sales={filteredSales} onGoBack={navigateToSalesForm} />
         )}
       </main>
       {lightboxMessage && <Lightbox message={lightboxMessage} onClose={() => setLightboxMessage(null)} />}
