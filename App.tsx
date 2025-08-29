@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import SalesForm from './components/SalesForm';
 import SalesList from './components/SalesList';
 import InitialSetupForm from './components/InitialSetupForm';
@@ -39,13 +38,17 @@ const App: React.FC = () => {
           return;
         }
 
-        // Step 2: Fetch all related products in a single query if there are sales
-        let productsBySaleId = new Map<string, { nomeProduto: string; unidades: number }[]>();
+        // Step 2: Fetch all related products if there are sales
+        let productsBySaleId = new Map<string, { nome_produto: string; quantidade: number }[]>();
         if (salesData.length > 0) {
             const saleIds = salesData.map(s => s.id);
+            
+            // =================================================================
+            // CORREÇÃO 1: Usar 'nome_produto' e 'quantidade' no SELECT
+            // =================================================================
             const { data: productsData, error: productsError } = await supabase
               .from('sale_products')
-              .select('sale_id, nomeProduto, unidades')
+              .select('sale_id, nome_produto, quantidade') // <-- AJUSTADO AQUI
               .in('sale_id', saleIds);
             
             if (productsError) throw productsError;
@@ -56,7 +59,10 @@ const App: React.FC = () => {
                 if (!productsBySaleId.has(p.sale_id)) {
                   productsBySaleId.set(p.sale_id, []);
                 }
-                productsBySaleId.get(p.sale_id)!.push({ nomeProduto: p.nomeProduto, unidades: p.unidades });
+                // =================================================================
+                // CORREÇÃO 2: Usar 'p.nome_produto' e 'p.quantidade' ao ler os dados
+                // =================================================================
+                productsBySaleId.get(p.sale_id)!.push({ nome_produto: p.nome_produto, quantidade: p.quantidade }); // <-- AJUSTADO AQUI
               });
             }
         }
@@ -64,7 +70,11 @@ const App: React.FC = () => {
         // Step 4: Combine sales data with their respective products
         const formattedSales = salesData.map(sale => ({
           ...sale,
-          produtos: productsBySaleId.get(sale.id) || [],
+          // Mapeamos de volta para o formato que o resto do app espera (se necessário), ou mantemos o padrão do DB
+          produtos: (productsBySaleId.get(sale.id) || []).map(p => ({
+              nomeProduto: p.nome_produto, // Convertendo de volta para o código usar
+              unidades: p.quantidade,     // Convertendo de volta para o código usar
+          })),
         })) as SalesData[];
 
         setAllSales(formattedSales);
@@ -92,9 +102,6 @@ const App: React.FC = () => {
   };
 
   const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
-    // Explicitly build the record to submit to the 'sales' table.
-    // This prevents any extra properties (like 'produtos') from being sent
-    // and ensures optional fields are correctly formatted.
     const recordToSubmit = {
       nomeUsuario: saleData.nomeUsuario,
       nomeEvento: saleData.nomeEvento,
@@ -107,13 +114,13 @@ const App: React.FC = () => {
       telefoneNumero: saleData.telefoneNumero,
       logradouroRua: saleData.logradouroRua,
       numeroEndereco: saleData.numeroEndereco,
-      // FIX: Ensure empty optional fields are sent as 'null' to the database.
       complemento: saleData.complemento || null,
       bairro: saleData.bairro,
       cidade: saleData.cidade,
       estado: saleData.estado,
       cep: saleData.cep,
       formaPagamento: saleData.formaPagamento,
+      observacao: saleData.observacao || null
     };
 
     if (isEditing && editingSaleId) {
@@ -125,11 +132,19 @@ const App: React.FC = () => {
           .eq('id', editingSaleId);
         if (saleUpdateError) throw saleUpdateError;
 
-        // Easiest way to handle product updates: delete old, insert new
         const { error: productDeleteError } = await supabase.from('sale_products').delete().eq('sale_id', editingSaleId);
         if (productDeleteError) throw productDeleteError;
 
-        const productsToInsert = saleData.produtos.map(p => ({ sale_id: editingSaleId, nomeProduto: p.nomeProduto, unidades: p.unidades }));
+        // =================================================================
+        // CORREÇÃO 3: Usar 'nome_produto' e 'quantidade' ao ENVIAR dados
+        // =================================================================
+        const productsToInsert = saleData.produtos.map(p => ({ 
+            sale_id: editingSaleId, 
+            nome_produto: p.nomeProduto, // <-- AJUSTADO AQUI
+            quantidade: p.unidades,       // <-- AJUSTADO AQUI
+            preco_unitario: 0 // Você precisará adicionar o preço aqui depois
+        }));
+
         if (productsToInsert.length > 0) {
             const { error: productInsertError } = await supabase.from('sale_products').insert(productsToInsert);
             if (productInsertError) throw productInsertError;
@@ -148,13 +163,22 @@ const App: React.FC = () => {
       try {
         const { data: insertedSale, error: saleInsertError } = await supabase
           .from('sales')
-          .insert([recordToSubmit]) // Supabase insert expects an array of objects
+          .insert([recordToSubmit])
           .select()
           .single();
         if (saleInsertError || !insertedSale) throw saleInsertError || new Error("Failed to get new sale ID");
 
-        const productsToInsert = saleData.produtos.map(p => ({ sale_id: insertedSale.id, nomeProduto: p.nomeProduto, unidades: p.unidades }));
-         if (productsToInsert.length > 0) {
+        // =================================================================
+        // CORREÇÃO 4: Usar 'nome_produto' e 'quantidade' ao ENVIAR dados
+        // =================================================================
+        const productsToInsert = saleData.produtos.map(p => ({ 
+            sale_id: insertedSale.id, 
+            nome_produto: p.nomeProduto, // <-- AJUSTADO AQUI
+            quantidade: p.unidades,       // <-- AJUSTADO AQUI
+            preco_unitario: 0 // Você precisará adicionar o preço aqui depois
+        }));
+
+        if (productsToInsert.length > 0) {
             const { error: productInsertError } = await supabase.from('sale_products').insert(productsToInsert);
             if (productInsertError) throw productInsertError;
         }
@@ -175,7 +199,6 @@ const App: React.FC = () => {
       return;
     }
     try {
-      // Thanks to 'ON DELETE CASCADE' in the database schema, we only need to delete the sale.
       const { error } = await supabase.from('sales').delete().eq('id', saleId);
       if (error) throw error;
 
@@ -221,15 +244,12 @@ const App: React.FC = () => {
   }, [allSales]);
 
   const uniqueUsers = useMemo<UserDetail[]>(() => {
-    // Start with the default users to ensure they are always present.
     const userSet = new Set<string>(DEFAULT_USERS);
-    // Add users from sales records to the set (duplicates are handled by Set).
     allSales.forEach(sale => {
       if (sale.nomeUsuario) {
         userSet.add(sale.nomeUsuario);
       }
     });
-    // Convert the set to an array, map to the correct object structure, and sort alphabetically.
     const users = Array.from(userSet, (name) => ({ name }));
     users.sort((a, b) => a.name.localeCompare(b.name));
     return users;
@@ -249,11 +269,10 @@ const App: React.FC = () => {
 
   const navigateToDashboard = () => setCurrentView('dashboard');
   const navigateToSalesForm = () => {
-    setEditingSaleId(null); // Ensure editing mode is off when just navigating
+    setEditingSaleId(null);
     setCurrentView('salesFormAndList');
   }
   const navigateToSetup = () => {
-    // Reset context when going back to setup
     setCurrentUser('');
     setCurrentEventName('');
     setCurrentEventDate('');
