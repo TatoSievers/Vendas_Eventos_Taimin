@@ -35,10 +35,8 @@ const PasswordScreen: React.FC<PasswordScreenProps> = ({ onCorrectPassword, appP
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-slate-900 to-slate-700 text-gray-200 relative">
-      <div className="absolute top-6 left-6">
-          <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-12 md:h-16 w-auto" />
-      </div>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-slate-900 to-slate-700 text-gray-200">
+      <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-24 w-auto mb-8" />
       <div className="w-full max-w-sm bg-slate-800 p-8 rounded-xl shadow-2xl">
         <h1 className="text-3xl font-bold text-white text-center mb-2">Acesso Restrito</h1>
         <p className="text-center text-gray-400 mb-6">Por favor, insira a senha para continuar.</p>
