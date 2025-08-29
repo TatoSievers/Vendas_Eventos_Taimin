@@ -326,7 +326,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         </div>
         
         <h3 className="text-xl font-semibold text-gray-200 pt-4 pb-2 border-b border-slate-700">Detalhes da Venda</h3>
-        <div>
+        <div className="mb-6">
           <label htmlFor="paymentMethodSelector" className="block text-sm font-medium text-gray-300 mb-1">Forma de Pagamento <span className="text-red-500">*</span></label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10"><CreditCardIcon className="h-5 w-5 text-gray-400" /></div>
@@ -350,7 +350,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         <h4 className="text-lg font-medium text-gray-200 pt-4">Produtos</h4>
         <div className="space-y-4 p-4 bg-slate-700/50 rounded-md">
             
-            <div className="flex items-end gap-4">
+            <div className="flex items-start gap-4">
                 <div className="flex-grow">
                     <label htmlFor="produto" className="block text-sm font-medium text-gray-300 mb-1">Produto</label>
                     <div className="relative">
@@ -372,12 +372,18 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
                 </div>
 
                 <div className="shrink-0" style={{width: '6rem'}}>
-                     <InputField label="Unid." id="unidades" name="unidades" type="number" value={currentUnits} 
+                    <label htmlFor="unidades" className="block text-sm font-medium text-gray-300 mb-1">Unid.</label>
+                    <input
+                        id="unidades"
+                        name="unidades"
+                        type="number"
+                        value={currentUnits} 
                         onChange={(e) => {
                             const val = e.target.value;
                             setCurrentUnits(val === '' ? '' : Math.max(1, parseInt(val, 10) || 1));
                         }}
                         min={1}
+                        className="w-full p-3 border border-gray-600 rounded-md shadow-sm bg-gray-700 text-white placeholder-gray-400 focus:ring-primary focus:border-primary transition duration-150 ease-in-out"
                      />
                 </div>
             </div>

@@ -2,7 +2,7 @@
 
 import React, { useMemo, useEffect, useRef } from 'react';
 import { SalesData } from '../types';
-import { ArrowUturnLeftIcon, DownloadIcon } from './icons';
+import { ArrowUturnLeftIcon, DownloadIcon, ChevronDownIcon, UserIcon, CubeIcon, CreditCardIcon } from './icons';
 import { Chart, registerables } from 'chart.js/auto';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -136,12 +136,10 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
     const addHeaderFooter = () => {
         for (let i = 1; i <= doc.getNumberOfPages(); i++) {
             doc.setPage(i);
-            // Cabeçalho
             doc.setFontSize(10);
             doc.setTextColor(100);
             doc.text('Relatório Gerencial - Vendas Taimin', 10, 10);
-            // Rodapé
-            doc.text(`Página ${i}`, pageWidth - 15, doc.internal.pageSize.getHeight() - 10);
+            doc.text(`Página ${i} de ${doc.getNumberOfPages()}`, pageWidth - 25, doc.internal.pageSize.getHeight() - 10);
         }
     };
     
@@ -183,7 +181,7 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
     addChartToPdf(productChartRef, 'Top 5 Produtos Mais Vendidos');
     addChartToPdf(eventChartRef, 'Distribuição de Vendas por Evento');
 
-    // --- Tabelas Detalhadas ---
+    // --- Tabelas de Resumo ---
     const addDetailedTable = (title: string, head: any[], body: any[]) => {
         if (yPos + 40 > doc.internal.pageSize.getHeight()) { doc.addPage(); yPos = 20; }
         doc.setFontSize(16);
@@ -203,16 +201,59 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
         [['Evento', 'Nº de Vendas', 'Unidades Vendidas']],
         Object.entries(salesPerEvent).map(([name, data]) => [name, data.salesCount, data.unitsSold])
     );
+
+    // --- Detalhamento de Vendas por Evento ---
+    doc.addPage();
+    yPos = 20;
+    doc.setFontSize(18);
+    doc.text('Detalhamento de Vendas por Evento', 14, yPos);
+    yPos += 15;
+
+    const eventNamesForPdf = Object.keys(salesPerEvent);
+    eventNamesForPdf.forEach((eventName, index) => {
+        const eventSales = sales.filter(s => s.nomeEvento === eventName);
+        if (eventSales.length === 0) return;
+
+        const tableBody = eventSales.map(sale => [
+            `${sale.primeiroNome} ${sale.sobrenome}`,
+            sale.produtos.map(p => `${p.nomeProduto} (${p.unidades})`).join('\n'),
+            sale.formaPagamento,
+            sale.nomeUsuario
+        ]);
+
+        const tableHeight = (tableBody.length + 1) * 10 + 20; // Aproximação da altura
+        if (yPos + tableHeight > doc.internal.pageSize.getHeight() && index > 0) {
+            doc.addPage();
+            yPos = 20;
+        }
+        
+        doc.setFontSize(14);
+        doc.setTextColor(8, 145, 178);
+        doc.text(eventName, 14, yPos);
+        yPos += 8;
+        doc.setTextColor(40);
+
+        (doc as any).autoTable({
+            startY: yPos,
+            head: [['Cliente', 'Produtos', 'Pagamento', 'Vendedor']],
+            body: tableBody,
+            theme: 'grid',
+            headStyles: { fillColor: [8, 145, 178] },
+        });
+        yPos = (doc as any).lastAutoTable.finalY + 15;
+    });
     
     addHeaderFooter();
     doc.save('Relatorio_Gerencial_Vendas_Taimin.pdf');
   };
 
+  const eventNames = useMemo(() => Object.keys(salesPerEvent), [salesPerEvent]);
+
   return (
     <div className="w-full max-w-6xl bg-slate-800 p-6 md:p-10 rounded-xl shadow-2xl">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-3xl font-semibold text-white">Relatório Gerencial</h2>
-        <div>
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+        <h2 className="text-3xl font-semibold text-white text-center sm:text-left">Relatório Gerencial</h2>
+        <div className="flex items-center">
             <button onClick={handleDownloadManagerialPdf} className="flex items-center text-sm bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md shadow-md mr-4">
                 <DownloadIcon className="h-5 w-5 mr-2"/>
                 Baixar Relatório PDF
@@ -237,7 +278,7 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
       </div>
       
       {/* Data Tables */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
           <div className="bg-slate-700 p-4 sm:p-6 rounded-lg shadow">
               <h3 className="text-xl font-semibold text-white mb-4">Top 5 Produtos</h3>
               <ul className="space-y-2 text-gray-300">
@@ -263,6 +304,33 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
               </ul>
           </div>
       </div>
+
+       {/* Detalhamento por Evento */}
+       <div className="bg-slate-700 p-4 sm:p-6 rounded-lg shadow">
+            <h3 className="text-xl font-semibold text-white mb-4">Detalhamento de Vendas por Evento</h3>
+            <div className="space-y-2">
+                {eventNames.map(eventName => (
+                    <details key={eventName} className="group bg-slate-600/50 rounded-lg">
+                        <summary className="p-3 cursor-pointer text-cyan-300 hover:bg-slate-600 flex justify-between items-center rounded-lg transition-colors">
+                            <span className="font-semibold">{eventName} ({salesPerEvent[eventName].salesCount} vendas)</span>
+                            <ChevronDownIcon className="h-5 w-5 transition-transform duration-300 group-open:rotate-180"/>
+                        </summary>
+                        <div className="border-t border-slate-500 p-4 space-y-4">
+                            {sales.filter(s => s.nomeEvento === eventName).map(sale => (
+                                <div key={sale.id} className="bg-slate-700/80 p-3 rounded-md text-sm">
+                                    <p className="font-bold text-white">{sale.primeiroNome} {sale.sobrenome}</p>
+                                    <div className="text-gray-300 mt-2 space-y-1">
+                                      <p className="flex items-center"><CubeIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.produtos.map(p => `${p.nomeProduto} (${p.unidades})`).join(', ')}</p>
+                                      <p className="flex items-center"><CreditCardIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.formaPagamento}</p>
+                                      <p className="flex items-center"><UserIcon className="h-4 w-4 mr-2 text-cyan-400"/> Vendedor(a): {sale.nomeUsuario}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </details>
+                ))}
+            </div>
+       </div>
     </div>
   );
 };
