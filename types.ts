@@ -1,116 +1,87 @@
+// Este arquivo define os "formatos" ou "modelos" de dados para toda a aplicação.
 
-export interface ProdutoVenda {
+/**
+ * Detalhes de um único produto dentro de uma venda.
+ */
+export interface ProductDetail {
   nomeProduto: string;
   unidades: number;
+  preco_unitario?: number; // Opcional por enquanto
 }
 
+/**
+ * O modelo completo para um registro de venda, incluindo dados do evento,
+ * cliente e os produtos vendidos.
+ */
 export interface SalesData {
-  id?: string; // Unique ID for each sale, must be optional for new records
-  created_at?: string; // Supabase timestamp, must be optional for new records
-  nomeUsuario: string; // User who registered the sale
-  nomeEvento: string;
-  dataEvento: string; // Stored as YYYY-MM-DD
+  id: string;
+  created_at: string;
   
-  primeiroNome: string; // Customer's first name
-  sobrenome: string; // Customer's last name
+  // Dados do Vendedor/Evento
+  nomeUsuario: string;
+  nomeEvento: string;
+  dataEvento: string;
+  
+  // Dados do Cliente
+  primeiroNome: string;
+  sobrenome: string;
   cpf: string;
   email: string;
   ddd: string;
   telefoneNumero: string;
   
-  logradouroRua: string; 
-  numeroEndereco: string; // To avoid conflict with product 'unidades' or other 'numero'
-  complemento: string | null;
+  // Endereço do Cliente
+  logradouroRua: string;
+  numeroEndereco: string;
+  complemento?: string | null;
   bairro: string;
   cidade: string;
   estado: string;
   cep: string;
-
-  formaPagamento: string;
   
-  produtos: ProdutoVenda[];
+  // Detalhes da Venda
+  formaPagamento: string;
+  observacao?: string | null; // <-- Campo adicionado/confirmado
+
+  // Lista de produtos nesta venda
+  produtos: ProductDetail[];
 }
 
-// For fields that are part of SalesData but might be handled differently in forms
-export type SalesFormData = Omit<SalesData, 'id' | 'nomeUsuario' | 'produtos' | 'nomeEvento' | 'dataEvento' | 'created_at'>;
-
-
-export interface InputFieldProps {
-  label: string;
-  id: string;
-  name: keyof SalesFormData | 'unidades' | 'newUserName' | 'newEventName' | 'newPaymentMethodName' | 'dataEvento'; // Extended for new specific inputs and dataEvento
-  type: string;
-  value: string | number; // Value can be number for 'unidades'
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void; // Added for CPF check
-  placeholder?: string;
-  required?: boolean;
-  Icon?: React.ElementType;
-  readOnly?: boolean;
-  className?: string;
-  maxLength?: number; // For fields like DDD
-  pattern?: string; // For input validation if needed
-  min?: string | number; // For number inputs like unidades
-}
-
-export interface TextAreaFieldProps {
-  label:string;
-  id: string;
-  name: keyof SalesFormData;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  placeholder?: string;
-  rows?: number;
-  required?: boolean;
-  Icon?: React.ElementType;
-}
-
+/**
+ * Detalhes de um evento único, usado para popular filtros e listas.
+ */
 export interface EventDetail {
   name: string;
-  date: string; // Stored as YYYY-MM-DD
+  date: string;
 }
 
+/**
+ * Detalhes de um usuário (vendedor) único.
+ */
 export interface UserDetail {
   name: string;
 }
 
+/**
+ * Detalhes de um método de pagamento único.
+ */
 export interface PaymentMethodDetail {
   name: string;
 }
 
-export interface ProdutoInfo {
-  name: string;
-}
-
+/**
+ * Dados coletados na tela de configuração inicial.
+ */
 export interface InitialSetupData {
   userName: string;
   eventName: string;
   eventDate: string;
 }
 
+/**
+ * Formato da mensagem para notificações (lightbox).
+ */
 export interface LightboxMessage {
   type: 'success' | 'error' | 'info';
   text: string;
-}
-
-export interface SalesFormProps {
-  onSaveSale: (sale: SalesData, isEditing: boolean) => void;
-  editingSale: SalesData | null;
-  onCancelEdit: () => void;
-  uniqueEvents: EventDetail[]; 
-  uniquePaymentMethods: PaymentMethodDetail[];
-  allSales: SalesData[]; 
-  currentUser: string;
-  currentEventName: string;
-  currentEventDate: string;
-  onGoBackToSetup: () => void;
-  onNotify: (message: LightboxMessage) => void;
-}
-
-export interface SalesListProps {
-  sales: SalesData[];
-  onNavigateToDashboard: () => void;
-  onEditSale: (saleId: string) => void;
-  onDeleteSale: (saleId: string) => void;
-  onNotify: (message: LightboxMessage) => void;
 }
