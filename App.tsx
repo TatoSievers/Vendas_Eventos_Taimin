@@ -93,7 +93,8 @@ const App: React.FC = () => {
 
   const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
     // Explicitly build the record to submit to the 'sales' table.
-    // This prevents any extra properties (like 'produtos', 'id', etc.) from being sent.
+    // This prevents any extra properties (like 'produtos') from being sent
+    // and ensures optional fields are correctly formatted.
     const recordToSubmit = {
       nomeUsuario: saleData.nomeUsuario,
       nomeEvento: saleData.nomeEvento,
@@ -106,7 +107,8 @@ const App: React.FC = () => {
       telefoneNumero: saleData.telefoneNumero,
       logradouroRua: saleData.logradouroRua,
       numeroEndereco: saleData.numeroEndereco,
-      complemento: saleData.complemento,
+      // FIX: Ensure empty optional fields are sent as 'null' to the database.
+      complemento: saleData.complemento || null,
       bairro: saleData.bairro,
       cidade: saleData.cidade,
       estado: saleData.estado,

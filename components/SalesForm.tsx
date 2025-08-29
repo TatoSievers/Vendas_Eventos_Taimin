@@ -16,7 +16,7 @@ const initialFormState: SalesFormData = {
   telefoneNumero: '',
   logradouroRua: '',
   numeroEndereco: '',
-  complemento: '',
+  complemento: null,
   bairro: '',
   cidade: '',
   estado: '',
