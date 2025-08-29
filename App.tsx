@@ -269,9 +269,9 @@ const App: React.FC = () => {
 
   if (!appPassword) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 text-white">
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 text-white text-center">
         <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-24 w-auto mb-8" />
-        <div className="text-center bg-slate-800 p-8 rounded-lg shadow-2xl">
+        <div className="bg-slate-800 p-8 rounded-lg shadow-2xl">
           <h1 className="text-2xl text-red-400 font-bold">Erro de Configuração</h1>
           <p className="text-lg text-gray-300 mt-2">A senha de acesso não foi configurada.</p>
         </div>
@@ -285,9 +285,9 @@ const App: React.FC = () => {
   
   if (!isDataLoaded) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 text-white">
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 text-white text-center">
         <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-24 w-auto mb-8" />
-        <div className="text-center">
+        <div>
             <svg className="animate-spin h-10 w-10 text-primary mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -300,52 +300,59 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col p-4 bg-gradient-to-br from-slate-900 to-slate-700 text-gray-200">
-      <header className="my-6 md:my-8 w-full max-w-4xl flex flex-col items-center gap-4">
-        <button 
-          onClick={handleLogoClick} 
-          title="Voltar" 
-          className={currentView === 'setup' ? 'cursor-default' : 'transition-transform hover:scale-105'}
-          disabled={currentView === 'setup'}
-        >
-            <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-24 w-auto" />
-        </button>
-        <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight">Vendas Taimin</h1>
-      </header>
-      <main className={`w-full flex flex-col items-center space-y-8 md:space-y-12 ${currentView === 'setup' ? 'flex-grow justify-center' : ''}`}>
-        {currentView === 'setup' && (
+      {currentView === 'setup' ? (
+        <main className="w-full flex-grow flex flex-col items-center justify-center text-center">
+          <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-24 w-auto mb-4" />
+          <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight mb-8">Vendas Taimin</h1>
           <InitialSetupForm onSetupComplete={handleInitialSetupComplete} uniqueEvents={uniqueEvents} uniqueUsers={uniqueUsers} />
-        )}
-        {currentView === 'salesFormAndList' && (
-          <>
-            <SalesForm onSaveSale={handleSaveSale} editingSale={saleBeingEdited} onCancelEdit={handleCancelEdit} uniqueEvents={uniqueEvents} uniquePaymentMethods={uniquePaymentMethods} allSales={allSales} currentUser={currentUser} currentEventName={currentEventName} currentEventDate={currentEventDate} onGoBackToSetup={navigateToSetup} onNotify={setLightboxMessage} />
-            <SalesList 
-              sales={filteredSales}
-              allSalesForFilters={allSales}
-              onNavigateToDashboard={navigateToDashboard} 
-              onEditSale={handleSetEditingSale} 
-              onDeleteSale={handleDeleteSale}
-              onNotify={setLightboxMessage}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-              filterEvent={filterEvent}
-              setFilterEvent={setFilterEvent}
-              filterUser={filterUser}
-              setFilterUser={setFilterUser}
-              onDeleteEvent={handleDeleteEvent}
-            />
-          </>
-        )}
-        {currentView === 'dashboard' && (
-          <ManagerialDashboard 
-            allSales={allSales} 
-            initialFilterEvent={filterEvent} 
-            initialFilterUser={filterUser}
-            uniqueEvents={uniqueEvents}
-            uniqueUsers={uniqueUsers}
-            onGoBack={navigateToSalesForm} 
-          />
-        )}
-      </main>
+        </main>
+      ) : (
+        <>
+          <header className="my-6 md:my-8 w-full flex flex-col items-center gap-4 text-center">
+            <button 
+              onClick={handleLogoClick} 
+              title="Voltar" 
+              className={'transition-transform hover:scale-105'}
+            >
+              <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-24 w-auto" />
+            </button>
+            <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight">Vendas Taimin</h1>
+          </header>
+          <main className="w-full flex flex-col items-center space-y-8 md:space-y-12">
+            {currentView === 'salesFormAndList' && (
+              <>
+                <SalesForm onSaveSale={handleSaveSale} editingSale={saleBeingEdited} onCancelEdit={handleCancelEdit} uniqueEvents={uniqueEvents} uniquePaymentMethods={uniquePaymentMethods} allSales={allSales} currentUser={currentUser} currentEventName={currentEventName} currentEventDate={currentEventDate} onGoBackToSetup={navigateToSetup} onNotify={setLightboxMessage} />
+                <SalesList 
+                  sales={filteredSales}
+                  allSalesForFilters={allSales}
+                  onNavigateToDashboard={navigateToDashboard} 
+                  onEditSale={handleSetEditingSale} 
+                  onDeleteSale={handleDeleteSale}
+                  onNotify={setLightboxMessage}
+                  searchTerm={searchTerm}
+                  setSearchTerm={setSearchTerm}
+                  filterEvent={filterEvent}
+                  setFilterEvent={setFilterEvent}
+                  filterUser={filterUser}
+                  setFilterUser={setFilterUser}
+                  onDeleteEvent={handleDeleteEvent}
+                />
+              </>
+            )}
+            {currentView === 'dashboard' && (
+              <ManagerialDashboard 
+                allSales={allSales} 
+                initialFilterEvent={filterEvent} 
+                initialFilterUser={filterUser}
+                uniqueEvents={uniqueEvents}
+                uniqueUsers={uniqueUsers}
+                onGoBack={navigateToSalesForm} 
+              />
+            )}
+          </main>
+        </>
+      )}
+
       {lightboxMessage && <Lightbox message={lightboxMessage} onClose={() => setLightboxMessage(null)} />}
       <footer className="w-full text-center py-8 mt-auto">
         <p className="text-sm text-gray-400">&copy; {new Date().getFullYear()} Vendas Taimin.</p>
