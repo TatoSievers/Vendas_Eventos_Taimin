@@ -254,6 +254,14 @@ const App: React.FC = () => {
     setEditingSaleId(null);
     setCurrentView('setup');
   }
+  
+  const handleLogoClick = () => {
+    if (currentView === 'dashboard') {
+      navigateToSalesForm();
+    } else if (currentView === 'salesFormAndList') {
+      navigateToSetup();
+    }
+  };
 
   const saleBeingEdited = editingSaleId ? allSales.find(s => s.id === editingSaleId) || null : null;
   
@@ -261,7 +269,10 @@ const App: React.FC = () => {
 
   if (!appPassword) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 text-white">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 text-white relative">
+        <div className="absolute top-6 left-6">
+            <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-12 md:h-16 w-auto" />
+        </div>
         <div className="text-center bg-slate-800 p-8 rounded-lg shadow-2xl">
           <h1 className="text-2xl text-red-400 font-bold">Erro de Configuração</h1>
           <p className="text-lg text-gray-300 mt-2">A senha de acesso não foi configurada.</p>
@@ -276,7 +287,10 @@ const App: React.FC = () => {
   
   if (!isDataLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 text-white">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 text-white relative">
+        <div className="absolute top-6 left-6">
+            <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-12 md:h-16 w-auto" />
+        </div>
         <svg className="animate-spin h-10 w-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -287,8 +301,20 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center p-4 bg-gradient-to-br from-slate-900 to-slate-700 text-gray-200">
-      <header className="my-6 md:my-8 text-center w-full max-w-4xl">
-        <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight">Vendas Taimin</h1>
+      <header className="my-6 md:my-8 w-full max-w-4xl">
+        <div className="relative flex items-center justify-center">
+            <div className="absolute left-0">
+                <button 
+                  onClick={handleLogoClick} 
+                  title="Voltar" 
+                  className={currentView === 'setup' ? 'cursor-default' : ''}
+                  disabled={currentView === 'setup'}
+                >
+                    <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-12 md:h-16 w-auto transition-transform hover:scale-105" />
+                </button>
+            </div>
+            <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight">Vendas Taimin</h1>
+        </div>
       </header>
       <main className="w-full flex flex-col items-center space-y-8 md:space-y-12">
         {currentView === 'setup' && (
@@ -315,7 +341,14 @@ const App: React.FC = () => {
           </>
         )}
         {currentView === 'dashboard' && (
-          <ManagerialDashboard sales={filteredSales} onGoBack={navigateToSalesForm} />
+          <ManagerialDashboard 
+            allSales={allSales} 
+            initialFilterEvent={filterEvent} 
+            initialFilterUser={filterUser}
+            uniqueEvents={uniqueEvents}
+            uniqueUsers={uniqueUsers}
+            onGoBack={navigateToSalesForm} 
+          />
         )}
       </main>
       {lightboxMessage && <Lightbox message={lightboxMessage} onClose={() => setLightboxMessage(null)} />}

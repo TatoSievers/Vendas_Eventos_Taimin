@@ -1,7 +1,6 @@
 
-
-import React, { useMemo, useEffect, useRef } from 'react';
-import { SalesData } from '../types';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
+import { SalesData, EventDetail, UserDetail } from '../types';
 import { ArrowUturnLeftIcon, DownloadIcon, ChevronDownIcon, UserIcon, CubeIcon, CreditCardIcon } from './icons';
 import { Chart, registerables } from 'chart.js/auto';
 import jsPDF from 'jspdf';
@@ -10,7 +9,11 @@ import 'jspdf-autotable';
 Chart.register(...registerables);
 
 interface ManagerialDashboardProps {
-  sales: SalesData[];
+  allSales: SalesData[];
+  initialFilterEvent: string;
+  initialFilterUser: string;
+  uniqueEvents: EventDetail[];
+  uniqueUsers: UserDetail[];
   onGoBack: () => void;
 }
 
@@ -23,7 +26,6 @@ const getChartOptions = (titleText: string, isPieChart: boolean = false) => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
-    // FIX: Add 'as const' to both ternary branches to ensure correct type for legend position.
     legend: { position: isPieChart ? 'top' as const : 'bottom' as const, labels: { color: '#e5e7eb', font: { size: 12 }}},
     title: { display: true, text: titleText, color: '#f9fafb', font: { size: 16, weight: 'bold' as const }},
     tooltip: { backgroundColor: 'rgba(0,0,0,0.7)', titleColor: '#ffffff', bodyColor: '#ffffff' }
@@ -44,39 +46,50 @@ const StatCard: React.FC<{title: string; value: string | number;}> = ({ title, v
 );
 
 
-const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBack }) => {
-  const totalSalesCount = sales.length;
-  const totalUnitsSold = useMemo(() => sales.reduce((sum, sale) => sum + sale.produtos.reduce((pSum, p) => pSum + p.unidades, 0), 0), [sales]);
+const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, initialFilterEvent, initialFilterUser, uniqueEvents, uniqueUsers, onGoBack }) => {
+  const [filterEvent, setFilterEvent] = useState(initialFilterEvent);
+  const [filterUser, setFilterUser] = useState(initialFilterUser);
+
+  const filteredSales = useMemo(() => {
+    return allSales.filter(sale => {
+      const matchesEvent = filterEvent ? sale.nomeEvento === filterEvent : true;
+      const matchesUser = filterUser ? sale.nomeUsuario === filterUser : true;
+      return matchesEvent && matchesUser;
+    });
+  }, [allSales, filterEvent, filterUser]);
+
+  const totalSalesCount = filteredSales.length;
+  const totalUnitsSold = useMemo(() => filteredSales.reduce((sum, sale) => sum + sale.produtos.reduce((pSum, p) => pSum + p.unidades, 0), 0), [filteredSales]);
 
   const salesPerProduct = useMemo<ProductSummary>(() => {
     const summary: ProductSummary = {};
-    sales.forEach(sale => sale.produtos.forEach(item => {
+    filteredSales.forEach(sale => sale.produtos.forEach(item => {
       summary[item.nomeProduto] = (summary[item.nomeProduto] || 0) + item.unidades;
     }));
     return Object.fromEntries(Object.entries(summary).sort(([, a], [, b]) => b - a));
-  }, [sales]);
+  }, [filteredSales]);
   
   const topProduct = Object.keys(salesPerProduct)[0] || 'N/A';
 
   const salesPerEvent = useMemo<EventSummary>(() => {
     const summary: EventSummary = {};
-    sales.forEach(sale => {
+    filteredSales.forEach(sale => {
       if (!summary[sale.nomeEvento]) summary[sale.nomeEvento] = { salesCount: 0, unitsSold: 0 };
       summary[sale.nomeEvento].salesCount += 1;
       summary[sale.nomeEvento].unitsSold += sale.produtos.reduce((sum, p) => sum + p.unidades, 0);
     });
     return Object.fromEntries(Object.entries(summary).sort(([, a], [, b]) => b.salesCount - a.salesCount));
-  }, [sales]);
+  }, [filteredSales]);
 
   const userSalesData = useMemo<UserSalesSummary>(() => {
     const summary: UserSalesSummary = {};
-    sales.forEach(sale => {
+    filteredSales.forEach(sale => {
       if (!summary[sale.nomeUsuario]) summary[sale.nomeUsuario] = { totalUnitsSold: 0, salesCount: 0 };
       summary[sale.nomeUsuario].salesCount += 1;
       summary[sale.nomeUsuario].totalUnitsSold += sale.produtos.reduce((sum, p) => sum + p.unidades, 0);
     });
     return Object.fromEntries(Object.entries(summary).sort(([, a], [, b]) => b.totalUnitsSold - a.totalUnitsSold));
-  }, [sales]);
+  }, [filteredSales]);
 
   const productChartRef = useRef<HTMLCanvasElement>(null);
   const eventChartRef = useRef<HTMLCanvasElement>(null);
@@ -124,7 +137,6 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
     const pageWidth = doc.internal.pageSize.getWidth();
     let yPos = 20;
 
-    // Helper para Título
     const addTitle = (title: string) => {
       doc.setFontSize(22);
       doc.setTextColor(40);
@@ -132,7 +144,6 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
       yPos += 15;
     };
     
-    // Helper para Cabeçalho e Rodapé
     const addHeaderFooter = () => {
         for (let i = 1; i <= doc.getNumberOfPages(); i++) {
             doc.setPage(i);
@@ -143,11 +154,16 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
         }
     };
     
-    // --- Página 1: Capa e KPIs ---
     addTitle('Relatório Gerencial de Vendas');
     doc.setFontSize(12);
     doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth / 2, yPos, { align: 'center' });
-    yPos += 20;
+    if (filterEvent || filterUser) {
+        yPos += 7;
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Filtros: ${filterEvent ? `Evento: ${filterEvent}`: ''} ${filterUser ? `Usuário: ${filterUser}`: ''}`, pageWidth / 2, yPos, { align: 'center' });
+    }
+    yPos += 13;
 
     (doc as any).autoTable({
         startY: yPos,
@@ -163,7 +179,6 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
     });
     yPos = (doc as any).lastAutoTable.finalY + 15;
     
-    // --- Gráficos ---
     const addChartToPdf = (chartRef: React.RefObject<HTMLCanvasElement>, title: string) => {
         if (chartRef.current) {
             if (yPos + 80 > doc.internal.pageSize.getHeight()) { doc.addPage(); yPos = 20; }
@@ -181,8 +196,8 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
     addChartToPdf(productChartRef, 'Top 5 Produtos Mais Vendidos');
     addChartToPdf(eventChartRef, 'Distribuição de Vendas por Evento');
 
-    // --- Tabelas de Resumo ---
     const addDetailedTable = (title: string, head: any[], body: any[]) => {
+        if (body.length === 0) return;
         if (yPos + 40 > doc.internal.pageSize.getHeight()) { doc.addPage(); yPos = 20; }
         doc.setFontSize(16);
         doc.text(title, 14, yPos);
@@ -202,46 +217,47 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
         Object.entries(salesPerEvent).map(([name, data]) => [name, data.salesCount, data.unitsSold])
     );
 
-    // --- Detalhamento de Vendas por Evento ---
-    doc.addPage();
-    yPos = 20;
-    doc.setFontSize(18);
-    doc.text('Detalhamento de Vendas por Evento', 14, yPos);
-    yPos += 15;
-
     const eventNamesForPdf = Object.keys(salesPerEvent);
-    eventNamesForPdf.forEach((eventName, index) => {
-        const eventSales = sales.filter(s => s.nomeEvento === eventName);
-        if (eventSales.length === 0) return;
-
-        const tableBody = eventSales.map(sale => [
-            `${sale.primeiroNome} ${sale.sobrenome}`,
-            sale.produtos.map(p => `${p.nomeProduto} (${p.unidades})`).join('\n'),
-            sale.formaPagamento,
-            sale.nomeUsuario
-        ]);
-
-        const tableHeight = (tableBody.length + 1) * 10 + 20; // Aproximação da altura
-        if (yPos + tableHeight > doc.internal.pageSize.getHeight() && index > 0) {
-            doc.addPage();
-            yPos = 20;
-        }
-        
-        doc.setFontSize(14);
-        doc.setTextColor(8, 145, 178);
-        doc.text(eventName, 14, yPos);
-        yPos += 8;
-        doc.setTextColor(40);
-
-        (doc as any).autoTable({
-            startY: yPos,
-            head: [['Cliente', 'Produtos', 'Pagamento', 'Vendedor']],
-            body: tableBody,
-            theme: 'grid',
-            headStyles: { fillColor: [8, 145, 178] },
+    if(eventNamesForPdf.length > 0) {
+        doc.addPage();
+        yPos = 20;
+        doc.setFontSize(18);
+        doc.text('Detalhamento de Vendas por Evento', 14, yPos);
+        yPos += 15;
+    
+        eventNamesForPdf.forEach((eventName, index) => {
+            const eventSales = filteredSales.filter(s => s.nomeEvento === eventName);
+            if (eventSales.length === 0) return;
+    
+            const tableBody = eventSales.map(sale => [
+                `${sale.primeiroNome} ${sale.sobrenome}`,
+                sale.produtos.map(p => `${p.nomeProduto} (${p.unidades})`).join('\n'),
+                sale.formaPagamento,
+                sale.nomeUsuario
+            ]);
+    
+            const tableHeight = (tableBody.length + 1) * 10 + 20;
+            if (yPos + tableHeight > doc.internal.pageSize.getHeight() && index > 0) {
+                doc.addPage();
+                yPos = 20;
+            }
+            
+            doc.setFontSize(14);
+            doc.setTextColor(8, 145, 178);
+            doc.text(eventName, 14, yPos);
+            yPos += 8;
+            doc.setTextColor(40);
+    
+            (doc as any).autoTable({
+                startY: yPos,
+                head: [['Cliente', 'Produtos', 'Pagamento', 'Vendedor']],
+                body: tableBody,
+                theme: 'grid',
+                headStyles: { fillColor: [8, 145, 178] },
+            });
+            yPos = (doc as any).lastAutoTable.finalY + 15;
         });
-        yPos = (doc as any).lastAutoTable.finalY + 15;
-    });
+    }
     
     addHeaderFooter();
     doc.save('Relatorio_Gerencial_Vendas_Taimin.pdf');
@@ -262,6 +278,18 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
                 <ArrowUturnLeftIcon className="h-5 w-5 mr-1" /> Voltar
             </button>
         </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 p-4 bg-slate-700/50 rounded-lg">
+        <select value={filterEvent} onChange={e => setFilterEvent(e.target.value)} className="w-full p-2 bg-slate-700 border border-slate-600 text-white rounded-md focus:ring-primary focus:border-primary">
+          <option value="">Todos os Eventos</option>
+          {uniqueEvents.map(event => <option key={event.name} value={event.name}>{event.name}</option>)}
+        </select>
+        <select value={filterUser} onChange={e => setFilterUser(e.target.value)} className="w-full p-2 bg-slate-700 border border-slate-600 text-white rounded-md focus:ring-primary focus:border-primary">
+          <option value="">Todos os Usuários</option>
+          {uniqueUsers.map(user => <option key={user.name} value={user.name}>{user.name}</option>)}
+        </select>
       </div>
 
       {/* KPI Stats */}
@@ -309,14 +337,14 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
        <div className="bg-slate-700 p-4 sm:p-6 rounded-lg shadow">
             <h3 className="text-xl font-semibold text-white mb-4">Detalhamento de Vendas por Evento</h3>
             <div className="space-y-2">
-                {eventNames.map(eventName => (
+                {eventNames.length > 0 ? eventNames.map(eventName => (
                     <details key={eventName} className="group bg-slate-600/50 rounded-lg">
                         <summary className="p-3 cursor-pointer text-cyan-300 hover:bg-slate-600 flex justify-between items-center rounded-lg transition-colors">
                             <span className="font-semibold">{eventName} ({salesPerEvent[eventName].salesCount} vendas)</span>
                             <ChevronDownIcon className="h-5 w-5 transition-transform duration-300 group-open:rotate-180"/>
                         </summary>
                         <div className="border-t border-slate-500 p-4 space-y-4">
-                            {sales.filter(s => s.nomeEvento === eventName).map(sale => (
+                            {filteredSales.filter(s => s.nomeEvento === eventName).map(sale => (
                                 <div key={sale.id} className="bg-slate-700/80 p-3 rounded-md text-sm">
                                     <p className="font-bold text-white">{sale.primeiroNome} {sale.sobrenome}</p>
                                     <div className="text-gray-300 mt-2 space-y-1">
@@ -328,7 +356,7 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ sales, onGoBa
                             ))}
                         </div>
                     </details>
-                ))}
+                )) : <p className="text-gray-400 text-center py-4">Nenhum evento encontrado para os filtros selecionados.</p>}
             </div>
        </div>
     </div>

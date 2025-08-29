@@ -371,7 +371,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
                     </div>
                 </div>
 
-                <div className="shrink-0" style={{width: '6rem'}}>
+                <div className="shrink-0 w-24">
                     <label htmlFor="unidades" className="block text-sm font-medium text-gray-300 mb-1">Unid.</label>
                     <input
                         id="unidades"
