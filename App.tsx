@@ -11,6 +11,52 @@ import { SalesData, EventDetail, UserDetail, InitialSetupData, PaymentMethodDeta
 import { supabase } from './lib/supabaseClient';
 import PasswordScreen from './components/PasswordScreen';
 
+// --- Helper Functions for Data Mapping ---
+
+// Maps database lowercase keys to application camelCase keys
+const keyMapFromDb: { [key: string]: string } = {
+    'id': 'id',
+    'created_at': 'created_at',
+    'nomeusuario': 'nomeUsuario',
+    'nomeevento': 'nomeEvento',
+    'dataevento': 'dataEvento',
+    'primeironome': 'primeiroNome',
+    'sobrenome': 'sobrenome',
+    'cpf': 'cpf',
+    'email': 'email',
+    'ddd': 'ddd',
+    'telefonenumero': 'telefoneNumero',
+    'logradourorua': 'logradouroRua',
+    'numeroendereco': 'numeroEndereco',
+    'complemento': 'complemento',
+    'bairro': 'bairro',
+    'cidade': 'cidade',
+    'estado': 'estado',
+    'cep': 'cep',
+    'formapagamento': 'formaPagamento',
+    'observacao': 'observacao'
+};
+
+// Converts a single record from database (lowercase keys) to application format (camelCase keys)
+const fromDatabaseRecord = (dbRecord: { [key: string]: any }): { [key: string]: any } => {
+    const appRecord: { [key: string]: any } = {};
+    for (const dbKey in dbRecord) {
+        const appKey = keyMapFromDb[dbKey] || dbKey;
+        appRecord[appKey] = dbRecord[dbKey];
+    }
+    return appRecord;
+};
+
+// Converts a record from application format (camelCase) to database format (lowercase)
+const toDatabaseRecord = (appRecord: { [key: string]: any }): { [key: string]: any } => {
+  const dbRecord: { [key: string]: any } = {};
+  for (const key in appRecord) {
+    dbRecord[key.toLowerCase()] = appRecord[key];
+  }
+  return dbRecord;
+};
+
+
 type AppView = 'setup' | 'salesFormAndList' | 'dashboard';
 
 const App: React.FC = () => {
@@ -72,13 +118,16 @@ const App: React.FC = () => {
           });
         }
         
-        const formattedSales = salesData ? salesData.map(sale => ({
-          ...sale,
-          produtos: (productsBySaleId.get(sale.id) || []).map(p => ({
+        const formattedSales = salesData ? salesData.map(dbSale => {
+          const appSale = fromDatabaseRecord(dbSale);
+          return {
+            ...appSale,
+            produtos: (productsBySaleId.get(dbSale.id) || []).map(p => ({
               nomeProduto: p.nome_produto,
               unidades: p.quantidade,
-          })),
-        })) as SalesData[] : [];
+            })),
+          };
+        }) as SalesData[] : [];
         setAllSales(formattedSales);
 
         // Novas buscas para usuários e eventos
@@ -178,7 +227,7 @@ const App: React.FC = () => {
 
 
   const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
-    const recordToSubmit = {
+    const recordToSubmitApp = {
       nomeUsuario: saleData.nomeUsuario,
       nomeEvento: saleData.nomeEvento,
       dataEvento: saleData.dataEvento,
@@ -198,10 +247,12 @@ const App: React.FC = () => {
       formaPagamento: saleData.formaPagamento,
       observacao: saleData.observacao || null,
     };
+    
+    const recordToSubmitDb = toDatabaseRecord(recordToSubmitApp);
 
     if (isEditing && editingSaleId) {
       try {
-        const { error: saleUpdateError } = await supabase.from('sales').update(recordToSubmit).eq('id', editingSaleId);
+        const { error: saleUpdateError } = await supabase.from('sales').update(recordToSubmitDb).eq('id', editingSaleId);
         if (saleUpdateError) throw saleUpdateError;
         await supabase.from('sale_products').delete().eq('sale_id', editingSaleId);
         const productsToInsert = saleData.produtos.map(p => ({ sale_id: editingSaleId, nome_produto: p.nomeProduto, quantidade: p.unidades, preco_unitario: 0 }));
@@ -209,21 +260,22 @@ const App: React.FC = () => {
           const { error } = await supabase.from('sale_products').insert(productsToInsert);
           if (error) throw error;
         }
-        setAllSales(prev => prev.map(s => s.id === editingSaleId ? { ...s, ...recordToSubmit, produtos: saleData.produtos } : s));
+        setAllSales(prev => prev.map(s => s.id === editingSaleId ? { ...s, ...recordToSubmitApp, produtos: saleData.produtos } : s));
         setLightboxMessage({ type: 'success', text: 'Venda atualizada com sucesso!' });
       } catch (error) {
         setLightboxMessage({ type: 'error', text: handleDBError(error, 'atualizar') });
       }
     } else {
       try {
-        const { data: inserted, error } = await supabase.from('sales').insert([recordToSubmit]).select().single();
+        const { data: inserted, error } = await supabase.from('sales').insert([recordToSubmitDb]).select().single();
         if (error || !inserted) throw error || new Error("Falha ao obter ID da nova venda");
         const productsToInsert = saleData.produtos.map(p => ({ sale_id: inserted.id, nome_produto: p.nomeProduto, quantidade: p.unidades, preco_unitario: 0 }));
         if (productsToInsert.length > 0) {
           const { error: pError } = await supabase.from('sale_products').insert(productsToInsert);
           if (pError) throw pError;
         }
-        setAllSales(prev => [{ ...inserted, produtos: saleData.produtos } as SalesData, ...prev]);
+        const newSaleAppFormat = fromDatabaseRecord(inserted);
+        setAllSales(prev => [{ ...newSaleAppFormat, produtos: saleData.produtos } as SalesData, ...prev]);
         setLightboxMessage({ type: 'success', text: 'Venda registrada com sucesso!' });
       } catch (error) {
         setLightboxMessage({ type: 'error', text: handleDBError(error, 'registrar') });
