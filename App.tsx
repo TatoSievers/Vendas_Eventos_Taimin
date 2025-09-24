@@ -77,6 +77,8 @@ const App: React.FC = () => {
   // Estados de dados independentes
   const [appUsers, setAppUsers] = useState<UserDetail[]>([]);
   const [appEvents, setAppEvents] = useState<EventDetail[]>([]);
+  const [appPaymentMethods, setAppPaymentMethods] = useState<PaymentMethodDetail[]>([]);
+
 
   // Estados para o contexto da venda
   const [currentUser, setCurrentUser] = useState<string>('');
@@ -138,7 +140,7 @@ const App: React.FC = () => {
         }) as SalesData[] : [];
         setAllSales(formattedSales);
 
-        // Novas buscas para usuários e eventos
+        // Novas buscas para usuários, eventos e formas de pagamento
         const { data: usersData, error: usersError } = await supabase.from('app_users').select('name');
         if (usersError) throw usersError;
         setAppUsers(usersData || []);
@@ -147,13 +149,17 @@ const App: React.FC = () => {
         if (eventsError) throw eventsError;
         setAppEvents(eventsData || []);
         
+        const { data: paymentMethodsData, error: paymentMethodsError } = await supabase.from('payment_methods').select('name');
+        if (paymentMethodsError) throw paymentMethodsError;
+        setAppPaymentMethods(paymentMethodsData || []);
+        
       } catch (error: unknown) {
         console.error("Error loading data from Supabase:", error);
         let userMessage = "Falha ao carregar os dados. Verifique a conexão com a internet e tente novamente.";
         const errorString = String(error).toLowerCase();
 
-        if (errorString.includes('relation "public.app_users" does not exist')) {
-            userMessage = "As tabelas de configuração (usuários/eventos) não foram encontradas. Por favor, execute o script SQL de atualização no painel do Supabase.";
+        if (errorString.includes('relation "public.app_users" does not exist') || errorString.includes('relation "public.payment_methods" does not exist')) {
+            userMessage = "As tabelas de configuração (usuários/eventos/pagamentos) não foram encontradas. Por favor, execute o script SQL de atualização no painel do Supabase.";
         } else if (errorString.includes('permission denied') || errorString.includes('rls')) {
             userMessage = "Erro de permissão ao acessar o banco de dados. Verifique se as políticas de segurança (RLS) estão habilitadas e configuradas no Supabase para permitir leitura e escrita.";
         } else if (errorString.includes('failed to fetch')) {
@@ -232,31 +238,26 @@ const App: React.FC = () => {
       throw new Error(handleDBError(error, 'criar'));
     }
   };
+  
+  const handleCreatePaymentMethod = async (name: string) => {
+    try {
+      const { data, error } = await supabase.from('payment_methods').insert({ name }).select().single();
+      if (error) throw error;
+      if (data) setAppPaymentMethods(prev => [...prev, { name: data.name }]);
+    } catch (error) {
+      if (String(error).includes('duplicate key')) {
+        console.warn(`Payment method "${name}" already exists.`);
+        return;
+      }
+      throw new Error(handleDBError(error, 'criar'));
+    }
+  };
 
 
   const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
-    const recordToSubmitApp = {
-      nomeUsuario: saleData.nomeUsuario,
-      nomeEvento: saleData.nomeEvento,
-      dataEvento: saleData.dataEvento,
-      primeiroNome: saleData.primeiroNome,
-      sobrenome: saleData.sobrenome,
-      cpf: saleData.cpf,
-      email: saleData.email,
-      ddd: saleData.ddd,
-      telefoneNumero: saleData.telefoneNumero,
-      logradouroRua: saleData.logradouroRua,
-      numeroEndereco: saleData.numeroEndereco,
-      complemento: saleData.complemento || null,
-      bairro: saleData.bairro,
-      cidade: saleData.cidade,
-      estado: saleData.estado,
-      cep: saleData.cep,
-      formaPagamento: saleData.formaPagamento,
-      observacao: saleData.observacao || null,
-    };
-    
-    const recordToSubmitDb = toDatabaseRecord(recordToSubmitApp);
+    // A 'saleData' que chega do formulário já tem todos os campos necessários.
+    // Apenas a convertemos para o formato do banco de dados.
+    const recordToSubmitDb = toDatabaseRecord(saleData);
 
     if (isEditing && editingSaleId) {
       try {
@@ -268,7 +269,8 @@ const App: React.FC = () => {
           const { error } = await supabase.from('sale_products').insert(productsToInsert);
           if (error) throw error;
         }
-        setAllSales(prev => prev.map(s => s.id === editingSaleId ? { ...s, ...recordToSubmitApp, produtos: saleData.produtos } : s));
+        // Atualiza o estado local com os dados completos vindos do formulário
+        setAllSales(prev => prev.map(s => (s.id === editingSaleId ? saleData : s)));
         setLightboxMessage({ type: 'success', text: 'Venda atualizada com sucesso!' });
       } catch (error) {
         setLightboxMessage({ type: 'error', text: handleDBError(error, 'atualizar') });
@@ -283,7 +285,12 @@ const App: React.FC = () => {
           if (pError) throw pError;
         }
         const newSaleAppFormat = fromDatabaseRecord(inserted);
-        setAllSales(prev => [{ ...newSaleAppFormat, produtos: saleData.produtos } as SalesData, ...prev]);
+        // Junta o retorno do DB (com id/created_at) com os produtos do formulário
+        const newCompleteSale: SalesData = {
+          ...(newSaleAppFormat as Omit<SalesData, 'produtos'>),
+          produtos: saleData.produtos,
+        };
+        setAllSales(prev => [newCompleteSale, ...prev]);
         setLightboxMessage({ type: 'success', text: 'Venda registrada com sucesso!' });
       } catch (error) {
         setLightboxMessage({ type: 'error', text: handleDBError(error, 'registrar') });
@@ -355,10 +362,10 @@ const App: React.FC = () => {
   }, [allSales, appUsers]);
 
   const uniquePaymentMethods = useMemo<PaymentMethodDetail[]>(() => {
-    const paymentMethodSet = new Set<string>();
+    const paymentMethodSet = new Set<string>(appPaymentMethods.map(pm => pm.name));
     allSales.forEach(s => { if (s.formaPagamento) paymentMethodSet.add(s.formaPagamento) });
     return Array.from(paymentMethodSet, name => ({ name })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [allSales]);
+  }, [allSales, appPaymentMethods]);
   
   const filteredSales = useMemo(() => {
     return allSales.filter(sale => {
@@ -406,6 +413,7 @@ const App: React.FC = () => {
     setAllSales([]);
     setAppUsers([]);
     setAppEvents([]);
+    setAppPaymentMethods([]);
     setIsDataLoaded(false);
   };
 
@@ -470,7 +478,19 @@ const App: React.FC = () => {
           <main className="w-full flex flex-col items-center space-y-8 md:space-y-12">
             {currentView === 'salesFormAndList' && (
               <>
-                <SalesForm onSaveSale={handleSaveSale} editingSale={saleBeingEdited} onCancelEdit={handleCancelEdit} uniquePaymentMethods={uniquePaymentMethods} allSales={allSales} currentUser={currentUser} currentEventName={currentEventName} currentEventDate={currentEventDate} onGoBackToSetup={navigateToSetup} onNotify={setLightboxMessage} />
+                <SalesForm 
+                  onSaveSale={handleSaveSale} 
+                  editingSale={saleBeingEdited} 
+                  onCancelEdit={handleCancelEdit} 
+                  uniquePaymentMethods={uniquePaymentMethods} 
+                  allSales={allSales} 
+                  currentUser={currentUser} 
+                  currentEventName={currentEventName} 
+                  currentEventDate={currentEventDate} 
+                  onGoBackToSetup={navigateToSetup} 
+                  onNotify={setLightboxMessage} 
+                  onCreatePaymentMethod={handleCreatePaymentMethod}
+                />
                 <SalesList 
                   sales={filteredSales}
                   allSalesForFilters={allSales}

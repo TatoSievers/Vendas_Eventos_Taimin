@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { SalesData, ProductDetail, SalesFormProps as SalesFormPropsType } from '../types';
 import InputField from './InputField';
@@ -16,7 +17,8 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     currentEventName, 
     currentEventDate,
     onGoBackToSetup,
-    onNotify
+    onNotify,
+    onCreatePaymentMethod
 }) => {
   const ADD_NEW_SENTINEL = "ADD_NEW_SENTINEL_VALUE";
   const getInitialFormState = (): SalesData => ({
@@ -56,9 +58,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
 
   useEffect(() => {
     if (isEditing && editingSale) {
-      // FIX: The `...editableData` spread was missing the `produtos` property,
-      // which is required by the `SalesData` type. Pass the full `editingSale`
-      // object to `setFormData` and extract `produtos` for `setSelectedProducts`.
       setFormData(editingSale);
       setSelectedProducts(editingSale.produtos || []);
       
@@ -77,7 +76,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     } else {
       resetFormState();
     }
-  }, [editingSale, isEditing, uniquePaymentMethods]);
+  }, [editingSale, isEditing, uniquePaymentMethods, currentUser, currentEventName, currentEventDate]);
 
   const resetFormState = () => {
     setFormData(getInitialFormState());
@@ -125,6 +124,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     if (value === ADD_NEW_SENTINEL) {
       setShowNewPaymentMethodInput(true);
       setSelectedPaymentMethod(ADD_NEW_SENTINEL); 
+      setNewPaymentMethodName('');
       setFormData(prev => ({ ...prev, formaPagamento: '' })); 
     } else {
       setShowNewPaymentMethodInput(false);
@@ -244,26 +244,37 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         setIsSubmitting(false);
         return;
     }
-    const salePayload: SalesData = {
-      ...formData,
-      nomeUsuario: currentUser,
-      nomeEvento: currentEventName,
-      dataEvento: currentEventDate,
-      formaPagamento: finalPaymentMethod,
-      produtos: selectedProducts,
-    };
 
-    if (isEditing && editingSale) {
-      salePayload.id = editingSale.id;
-      salePayload.created_at = editingSale.created_at;
+    try {
+      // Salva a nova forma de pagamento no banco de dados ANTES de salvar a venda
+      if (showNewPaymentMethodInput && finalPaymentMethod) {
+        await onCreatePaymentMethod(finalPaymentMethod);
+      }
+      
+      const salePayload: SalesData = {
+        ...formData,
+        nomeUsuario: currentUser,
+        nomeEvento: currentEventName,
+        dataEvento: currentEventDate,
+        formaPagamento: finalPaymentMethod,
+        produtos: selectedProducts,
+      };
+  
+      if (isEditing && editingSale) {
+        salePayload.id = editingSale.id;
+        salePayload.created_at = editingSale.created_at;
+      }
+  
+      await onSaveSale(salePayload, isEditing);
+  
+      if (!isEditing) {
+          resetFormState(); 
+      }
+    } catch (error: any) {
+      onNotify({type: 'error', text: error.message || 'Falha ao salvar a forma de pagamento.' });
+    } finally {
+      setIsSubmitting(false);
     }
-
-    await onSaveSale(salePayload, isEditing);
-
-    if (!isEditing) {
-        resetFormState(); 
-    }
-    setIsSubmitting(false);
   };
     
 

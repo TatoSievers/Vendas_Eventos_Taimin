@@ -135,6 +135,7 @@ export interface SalesFormProps {
     currentEventDate: string;
     onGoBackToSetup: () => void;
     onNotify: (message: LightboxMessage) => void;
+    onCreatePaymentMethod: (name: string) => Promise<void>;
 }
 
 export interface InitialSetupFormProps {
