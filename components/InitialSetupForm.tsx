@@ -1,18 +1,14 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { EventDetail, UserDetail, InitialSetupData } from '../types';
+import { EventDetail, UserDetail, InitialSetupData, InitialSetupFormProps as InitialSetupFormPropsType } from '../types';
 import InputField from './InputField';
 import { UserIcon, CalendarDaysIcon, TagIcon } from './icons';
 
 const ADD_NEW_SENTINEL = "ADD_NEW_SENTINEL_VALUE"; // Generic sentinel for both user and event
 
-interface InitialSetupFormProps {
-  onSetupComplete: (setupData: InitialSetupData) => void;
-  uniqueEvents: EventDetail[];
-  uniqueUsers: UserDetail[];
-}
 
-const InitialSetupForm: React.FC<InitialSetupFormProps> = ({ onSetupComplete, uniqueEvents, uniqueUsers }) => {
+const InitialSetupForm: React.FC<InitialSetupFormPropsType> = ({ onSetupComplete, uniqueEvents, uniqueUsers, onCreateUser, onCreateEvent }) => {
   const [selectedUserName, setSelectedUserName] = useState<string>('');
   const [newUserName, setNewUserName] = useState<string>('');
   const [showNewUserInput, setShowNewUserInput] = useState<boolean>(false);
@@ -25,6 +21,8 @@ const InitialSetupForm: React.FC<InitialSetupFormProps> = ({ onSetupComplete, un
   const [isEventDateReadOnly, setIsEventDateReadOnly] = useState<boolean>(false);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   useEffect(() => {
     // Auto-fill event date if an existing event is selected
@@ -68,31 +66,49 @@ const InitialSetupForm: React.FC<InitialSetupFormProps> = ({ onSetupComplete, un
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage(null);
+    setIsSubmitting(true);
 
     const finalUserName = showNewUserInput ? newUserName.trim() : selectedUserName;
     const finalEventName = showNewEventInput ? newEventName.trim() : selectedEventName;
 
     if (!finalUserName) {
       setErrorMessage("Por favor, selecione ou cadastre um nome de usuário.");
+      setIsSubmitting(false);
       return;
     }
     if (!finalEventName) {
       setErrorMessage("Por favor, selecione ou cadastre um nome de evento.");
+      setIsSubmitting(false);
       return;
     }
     if (!eventDate) {
       setErrorMessage("Por favor, insira a data do evento.");
+      setIsSubmitting(false);
       return;
     }
 
-    onSetupComplete({
-      userName: finalUserName,
-      eventName: finalEventName,
-      eventDate: eventDate,
-    });
+    try {
+      if (showNewUserInput && finalUserName) {
+        await onCreateUser(finalUserName);
+      }
+      if (showNewEventInput && finalEventName) {
+        await onCreateEvent(finalEventName, eventDate);
+      }
+      
+      onSetupComplete({
+        userName: finalUserName,
+        eventName: finalEventName,
+        eventDate: eventDate,
+      });
+
+    } catch (error: any) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -196,9 +212,10 @@ const InitialSetupForm: React.FC<InitialSetupFormProps> = ({ onSetupComplete, un
 
         <button
           type="submit"
-          className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-primary-light focus:ring-opacity-50 transition duration-150 ease-in-out"
+          disabled={isSubmitting}
+          className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-primary-light focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-70 disabled:cursor-not-allowed"
         >
-          Iniciar Registros
+          {isSubmitting ? 'Salvando...' : 'Iniciar Registros'}
         </button>
       </form>
     </div>

@@ -1,4 +1,5 @@
 
+
 // FIX: Import React to make its types available in this file.
 import React from 'react';
 
@@ -135,6 +136,15 @@ export interface SalesFormProps {
     onGoBackToSetup: () => void;
     onNotify: (message: LightboxMessage) => void;
 }
+
+export interface InitialSetupFormProps {
+  onSetupComplete: (setupData: InitialSetupData) => void;
+  uniqueEvents: EventDetail[];
+  uniqueUsers: UserDetail[];
+  onCreateUser: (name: string) => Promise<void>;
+  onCreateEvent: (name: string, date: string) => Promise<void>;
+}
+
 
 // FIX: Added missing interface for product information used in constants.
 export interface ProdutoInfo {

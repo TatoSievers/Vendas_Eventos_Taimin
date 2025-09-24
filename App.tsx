@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import SalesForm from './components/SalesForm';
 import SalesList from './components/SalesList';
@@ -8,7 +9,6 @@ import Lightbox from './components/Lightbox';
 import Header from './components/Header'; // Importação do novo cabeçalho
 import { SalesData, EventDetail, UserDetail, InitialSetupData, PaymentMethodDetail, LightboxMessage } from './types';
 import { supabase } from './lib/supabaseClient';
-import { DEFAULT_USERS } from './constants';
 import PasswordScreen from './components/PasswordScreen';
 
 type AppView = 'setup' | 'salesFormAndList' | 'dashboard';
@@ -20,6 +20,10 @@ const App: React.FC = () => {
   const [allSales, setAllSales] = useState<SalesData[]>([]);
   const [currentView, setCurrentView] = useState<AppView>('setup');
   
+  // Estados de dados independentes
+  const [appUsers, setAppUsers] = useState<UserDetail[]>([]);
+  const [appEvents, setAppEvents] = useState<EventDetail[]>([]);
+
   // Estados para o contexto da venda
   const [currentUser, setCurrentUser] = useState<string>('');
   const [currentEventName, setCurrentEventName] = useState<string>('');
@@ -39,28 +43,23 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const fetchSales = async () => {
+    const fetchInitialData = async () => {
       try {
+        // Busca de vendas e produtos (lógica existente)
         const { data: salesData, error: salesError } = await supabase
           .from('sales')
           .select('*')
           .order('created_at', { ascending: false });
 
         if (salesError) throw salesError;
-        if (!salesData) {
-          setAllSales([]);
-          return;
-        }
-
-        const saleIds = salesData.map(s => s.id);
         
+        const saleIds = salesData ? salesData.map(s => s.id) : [];
         let productsData: { sale_id: string; nome_produto: string; quantidade: number; }[] | null = [];
         if (saleIds.length > 0) {
             const { data, error: productsError } = await supabase
               .from('sale_products')
               .select('sale_id, nome_produto, quantidade')
               .in('sale_id', saleIds);
-                
             if (productsError) throw productsError;
             productsData = data;
         }
@@ -68,37 +67,42 @@ const App: React.FC = () => {
         const productsBySaleId = new Map<string, { nome_produto: string; quantidade: number }[]>();
         if (productsData) {
           productsData.forEach(p => {
-            if (!productsBySaleId.has(p.sale_id)) {
-              productsBySaleId.set(p.sale_id, []);
-            }
+            if (!productsBySaleId.has(p.sale_id)) productsBySaleId.set(p.sale_id, []);
             productsBySaleId.get(p.sale_id)!.push({ nome_produto: p.nome_produto, quantidade: p.quantidade });
           });
         }
         
-        const formattedSales = salesData.map(sale => ({
+        const formattedSales = salesData ? salesData.map(sale => ({
           ...sale,
           produtos: (productsBySaleId.get(sale.id) || []).map(p => ({
               nomeProduto: p.nome_produto,
               unidades: p.quantidade,
           })),
-        })) as SalesData[];
-
+        })) as SalesData[] : [];
         setAllSales(formattedSales);
+
+        // Novas buscas para usuários e eventos
+        const { data: usersData, error: usersError } = await supabase.from('app_users').select('name');
+        if (usersError) throw usersError;
+        setAppUsers(usersData || []);
+
+        const { data: eventsData, error: eventsError } = await supabase.from('app_events').select('name, date');
+        if (eventsError) throw eventsError;
+        setAppEvents(eventsData || []);
         
       } catch (error: unknown) {
         console.error("Error loading data from Supabase:", error);
-        
         let userMessage = "Falha ao carregar os dados. Verifique a conexão com a internet e tente novamente.";
         const errorString = String(error).toLowerCase();
 
-        if (errorString.includes('permission denied') || errorString.includes('rls')) {
+        if (errorString.includes('relation "public.app_users" does not exist')) {
+            userMessage = "As tabelas de configuração (usuários/eventos) não foram encontradas. Por favor, execute o script SQL de atualização no painel do Supabase.";
+        } else if (errorString.includes('permission denied') || errorString.includes('rls')) {
             userMessage = "Erro de permissão ao acessar o banco de dados. Verifique se as políticas de segurança (RLS) estão habilitadas e configuradas no Supabase para permitir leitura e escrita.";
         } else if (errorString.includes('failed to fetch')) {
-            userMessage = "Falha na conexão com o servidor. Verifique sua URL do Supabase, a chave e as configurações de CORS. Certifique-se também de que sua internet está funcionando.";
+            userMessage = "Falha na conexão com o servidor. Verifique sua URL do Supabase, a chave e as configurações de CORS.";
         } else if (error && typeof error === 'object' && 'message' in error) {
             userMessage = `Ocorreu um erro inesperado: ${(error as { message: string }).message}`;
-        } else {
-            userMessage = `Ocorreu um erro inesperado: ${String(error)}`;
         }
         
         setLightboxMessage({ type: 'error', text: userMessage });
@@ -108,7 +112,7 @@ const App: React.FC = () => {
       }
     };
 
-    fetchSales();
+    fetchInitialData();
   }, [isAuthenticated]);
 
 
@@ -121,6 +125,57 @@ const App: React.FC = () => {
     setEditingSaleId(null);
     setCurrentView('salesFormAndList');
   };
+
+  const handleDBError = (error: unknown, action: 'registrar' | 'atualizar' | 'criar'): string => {
+    console.error(`Error ${action} item:`, error);
+    let detailedMessage = `Erro ao ${action} o item.`;
+
+    if (error && typeof error === 'object' && 'message' in error) {
+        const dbError = error as { message: string, details?: string, code?: string };
+        const errorMessage = dbError.message.toLowerCase();
+        
+        if (dbError.details) {
+            detailedMessage = `Erro: ${dbError.details}`;
+        } else if (errorMessage.includes('not-null constraint')) {
+            const match = errorMessage.match(/column "(.*?)"/);
+            detailedMessage = `Erro: O campo obrigatório '${match ? match[1] : ''}' não foi preenchido.`;
+        } else if (errorMessage.includes('duplicate key value violates unique constraint')) {
+            detailedMessage = "Erro: Já existe um registro com este nome. Por favor, escolha outro.";
+        } else {
+            detailedMessage = `Erro do banco de dados: ${dbError.message}`;
+        }
+    }
+    return detailedMessage;
+  }
+
+  const handleCreateUser = async (name: string) => {
+    try {
+      const { data, error } = await supabase.from('app_users').insert({ name }).select().single();
+      if (error) throw error;
+      if (data) setAppUsers(prev => [...prev, { name: data.name }]);
+    } catch (error) {
+      if (String(error).includes('duplicate key')) {
+        console.warn(`User "${name}" already exists.`); // Don't bother user if it already exists
+        return;
+      }
+      throw new Error(handleDBError(error, 'criar'));
+    }
+  };
+
+  const handleCreateEvent = async (name: string, date: string) => {
+    try {
+      const { data, error } = await supabase.from('app_events').insert({ name, date }).select().single();
+      if (error) throw error;
+      if (data) setAppEvents(prev => [...prev, { name: data.name, date: data.date }]);
+    } catch (error) {
+      if (String(error).includes('duplicate key')) {
+        console.warn(`Event "${name}" already exists.`);
+        return;
+      }
+      throw new Error(handleDBError(error, 'criar'));
+    }
+  };
+
 
   const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
     const recordToSubmit = {
@@ -157,19 +212,7 @@ const App: React.FC = () => {
         setAllSales(prev => prev.map(s => s.id === editingSaleId ? { ...s, ...recordToSubmit, produtos: saleData.produtos } : s));
         setLightboxMessage({ type: 'success', text: 'Venda atualizada com sucesso!' });
       } catch (error) {
-        console.error("Error updating sale:", error);
-        let userMessage = "Erro ao atualizar a venda.";
-        if (error && typeof error === 'object' && 'message' in error) {
-            const dbError = error as { message: string };
-            const errorMessage = dbError.message.toLowerCase();
-            if (errorMessage.includes('not-null constraint')) {
-                const match = errorMessage.match(/column "(.*?)"/);
-                userMessage = `Erro: O campo '${match ? match[1] : 'obrigatório'}' não foi preenchido.`;
-            } else {
-                userMessage = `Erro do banco de dados: ${dbError.message}`;
-            }
-        }
-        setLightboxMessage({ type: 'error', text: userMessage });
+        setLightboxMessage({ type: 'error', text: handleDBError(error, 'atualizar') });
       }
     } else {
       try {
@@ -183,19 +226,7 @@ const App: React.FC = () => {
         setAllSales(prev => [{ ...inserted, produtos: saleData.produtos } as SalesData, ...prev]);
         setLightboxMessage({ type: 'success', text: 'Venda registrada com sucesso!' });
       } catch (error) {
-        console.error("Error creating sale:", error);
-        let userMessage = "Erro ao registrar a venda.";
-        if (error && typeof error === 'object' && 'message' in error) {
-            const dbError = error as { message: string };
-            const errorMessage = dbError.message.toLowerCase();
-            if (errorMessage.includes('not-null constraint')) {
-                const match = errorMessage.match(/column "(.*?)"/);
-                userMessage = `Erro: O campo '${match ? match[1] : 'obrigatório'}' não foi preenchido.`;
-            } else {
-                userMessage = `Erro do banco de dados: ${dbError.message}`;
-            }
-        }
-        setLightboxMessage({ type: 'error', text: userMessage });
+        setLightboxMessage({ type: 'error', text: handleDBError(error, 'registrar') });
       }
     }
     setEditingSaleId(null);
@@ -209,26 +240,25 @@ const App: React.FC = () => {
       setAllSales(prev => prev.filter(s => s.id !== saleId));
       setLightboxMessage({ type: 'success', text: 'Venda excluída com sucesso.' });
     } catch (error) {
-      console.error("Error deleting sale:", error);
       setLightboxMessage({ type: 'error', text: "Erro ao excluir a venda." });
     }
   };
 
   const handleDeleteEvent = async (eventName: string) => {
     const salesCount = allSales.filter(s => s.nomeEvento === eventName).length;
-    if (!window.confirm(`Tem certeza que deseja apagar o evento "${eventName}" e todas as suas ${salesCount} vendas associadas? Esta ação é irreversível.`)) {
-      return;
-    }
+    if (!window.confirm(`Tem certeza que deseja apagar o evento "${eventName}" e todas as suas ${salesCount} vendas associadas? Esta ação é irreversível.`)) return;
 
     try {
       const { error } = await supabase.from('sales').delete().eq('nomeEvento', eventName);
       if (error) throw error;
 
+      await supabase.from('app_events').delete().eq('name', eventName);
+      
+      setAppEvents(prev => prev.filter(e => e.name !== eventName));
       setAllSales(prev => prev.filter(s => s.nomeEvento !== eventName));
       setFilterEvent(''); // Reseta o filtro
       setLightboxMessage({ type: 'success', text: `Evento "${eventName}" e todas as suas vendas foram excluídos.` });
     } catch (error) {
-      console.error("Error deleting event:", error);
       setLightboxMessage({ type: 'error', text: "Erro ao excluir o evento." });
     }
   };
@@ -254,14 +284,15 @@ const App: React.FC = () => {
   const uniqueEvents = useMemo<EventDetail[]>(() => {
     const eventMap = new Map<string, string>();
     allSales.forEach(s => { if (s.nomeEvento && s.dataEvento) eventMap.set(s.nomeEvento, s.dataEvento) });
+    appEvents.forEach(e => { if (e.name && e.date) eventMap.set(e.name, e.date) });
     return Array.from(eventMap, ([name, date]) => ({ name, date })).sort((a,b) => a.name.localeCompare(b.name));
-  }, [allSales]);
+  }, [allSales, appEvents]);
 
   const uniqueUsers = useMemo<UserDetail[]>(() => {
-    const userSet = new Set<string>(DEFAULT_USERS);
+    const userSet = new Set<string>(appUsers.map(u => u.name));
     allSales.forEach(s => { if (s.nomeUsuario) userSet.add(s.nomeUsuario) });
     return Array.from(userSet, name => ({ name })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [allSales]);
+  }, [allSales, appUsers]);
 
   const uniquePaymentMethods = useMemo<PaymentMethodDetail[]>(() => {
     const paymentMethodSet = new Set<string>();
@@ -312,7 +343,10 @@ const App: React.FC = () => {
     setCurrentEventName('');
     setCurrentEventDate('');
     setEditingSaleId(null);
-    setIsDataLoaded(false); // Forçar recarregamento na próxima autenticação
+    setAllSales([]);
+    setAppUsers([]);
+    setAppEvents([]);
+    setIsDataLoaded(false);
   };
 
   const saleBeingEdited = editingSaleId ? allSales.find(s => s.id === editingSaleId) || null : null;
@@ -356,7 +390,13 @@ const App: React.FC = () => {
         <main className="w-full flex-grow flex flex-col items-center justify-center text-center">
           <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-24 w-auto mb-4" />
           <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight mb-8">Vendas Taimin</h1>
-          <InitialSetupForm onSetupComplete={handleInitialSetupComplete} uniqueEvents={uniqueEvents} uniqueUsers={uniqueUsers} />
+          <InitialSetupForm 
+            onSetupComplete={handleInitialSetupComplete} 
+            uniqueEvents={uniqueEvents} 
+            uniqueUsers={uniqueUsers}
+            onCreateUser={handleCreateUser}
+            onCreateEvent={handleCreateEvent}
+          />
         </main>
       ) : (
         <>

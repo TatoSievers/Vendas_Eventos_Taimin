@@ -1,4 +1,5 @@
 
+
 import { ProdutoInfo } from './types';
 
 export const PRODUTOS_TAIMIN: ProdutoInfo[] = [
@@ -20,6 +21,3 @@ export const PRODUTOS_TAIMIN: ProdutoInfo[] = [
   { name: "ZHEN ZHU AN SHEN WAN (珍珠安神丸)" },
   { name: "ER LONG ZUO CI WAN (耳聋左慈丸)" },
 ];
-
-// Default users that should always be available for selection.
-export const DEFAULT_USERS: string[] = ['Fernanda', 'Samantha', 'Regina'];
