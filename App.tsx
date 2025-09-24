@@ -37,6 +37,11 @@ const keyMapFromDb: { [key: string]: string } = {
     'observacao': 'observacao'
 };
 
+// Create the reverse map for writing TO the DB
+const keyMapToDb = Object.fromEntries(
+    Object.entries(keyMapFromDb).map(([dbKey, appKey]) => [appKey, dbKey])
+);
+
 // Converts a single record from database (lowercase keys) to application format (camelCase keys)
 const fromDatabaseRecord = (dbRecord: { [key: string]: any }): { [key: string]: any } => {
     const appRecord: { [key: string]: any } = {};
@@ -47,11 +52,14 @@ const fromDatabaseRecord = (dbRecord: { [key: string]: any }): { [key: string]: 
     return appRecord;
 };
 
-// Converts a record from application format (camelCase) to database format (lowercase)
+// Converts a record from application format (camelCase) to database format (lowercase) using an explicit map
 const toDatabaseRecord = (appRecord: { [key: string]: any }): { [key: string]: any } => {
   const dbRecord: { [key: string]: any } = {};
-  for (const key in appRecord) {
-    dbRecord[key.toLowerCase()] = appRecord[key];
+  for (const appKey in appRecord) {
+    const dbKey = keyMapToDb[appKey];
+    if (dbKey) { // Only map keys that are defined in our map
+        dbRecord[dbKey] = appRecord[appKey];
+    }
   }
   return dbRecord;
 };
