@@ -1,4 +1,4 @@
-import { db } from '../lib/db';
+import pool from '../lib/db';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -8,12 +8,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        // Busca de vendas e produtos em paralelo
-        const salesPromise = db.query(`SELECT * FROM sales ORDER BY created_at DESC`, []);
-        const productsPromise = db.query(`SELECT * FROM sale_products`, []);
-        const usersPromise = db.query(`SELECT name FROM app_users ORDER BY name`, []);
-        const eventsPromise = db.query(`SELECT name, date FROM app_events ORDER BY name`, []);
-        const paymentMethodsPromise = db.query(`SELECT name FROM payment_methods ORDER BY name`, []);
+        const salesPromise = pool.query(`SELECT * FROM sales ORDER BY created_at DESC`);
+        const productsPromise = pool.query(`SELECT * FROM sale_products`);
+        const usersPromise = pool.query(`SELECT name FROM app_users ORDER BY name`);
+        const eventsPromise = pool.query(`SELECT name, date FROM app_events ORDER BY name`);
+        const paymentMethodsPromise = pool.query(`SELECT name FROM payment_methods ORDER BY name`);
 
         const [
             salesResult,

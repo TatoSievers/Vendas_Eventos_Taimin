@@ -1,7 +1,6 @@
-import { db } from '../lib/db';
+import pool from '../lib/db';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Lida com POST para criar uma nova venda
 async function handlePost(req: VercelRequest, res: VercelResponse) {
     const { saleData, products } = req.body;
     
@@ -9,36 +8,38 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Dados da venda ou produtos ausentes.' });
     }
 
-    const client = await db.query('BEGIN', []); // Inicia a transação
-
+    const client = await pool.connect();
     try {
-        // Insere na tabela 'sales'
+        await client.query('BEGIN');
+
         const saleColumns = Object.keys(saleData).join(', ');
         const saleValues = Object.values(saleData);
         const salePlaceholders = saleValues.map((_, i) => `$${i + 1}`).join(', ');
 
         const insertSaleQuery = `INSERT INTO sales (${saleColumns}) VALUES (${salePlaceholders}) RETURNING *;`;
-        const newSaleResult = await db.query(insertSaleQuery, saleValues);
+        const newSaleResult = await client.query(insertSaleQuery, saleValues);
         const newSale = newSaleResult.rows[0];
 
-        // Insere na tabela 'sale_products'
         if (products.length > 0) {
-            const productInserts = products.map((p: any) => {
-                return db.query(
+            for (const p of products) {
+                await client.query(
                     'INSERT INTO sale_products (sale_id, nome_produto, quantidade, preco_unitario) VALUES ($1, $2, $3, $4)',
                     [newSale.id, p.nome_produto, p.quantidade, p.preco_unitario || 0]
                 );
-            });
-            await Promise.all(productInserts);
+            }
         }
 
-        await db.query('COMMIT', []); // Confirma a transação
+        await client.query('COMMIT');
         return res.status(201).json(newSale);
 
     } catch (error: any) {
-        await db.query('ROLLBACK', []); // Desfaz a transação em caso de erro
+        await client.query('ROLLBACK');
         console.error('API Error creating sale:', error);
-        return res.status(500).json({ error: 'Falha ao criar a venda.', details: error.message });
+        const dbError = error.detail || error.message;
+        const userMessage = dbError.includes('not-null constraint') ? `Erro: O campo obrigatório '${error.column}' não foi preenchido.` : 'Falha ao criar a venda.';
+        return res.status(500).json({ error: userMessage, details: dbError });
+    } finally {
+        client.release();
     }
 }
 
