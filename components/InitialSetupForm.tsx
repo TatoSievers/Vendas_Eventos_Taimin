@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { EventDetail, UserDetail, InitialSetupData, InitialSetupFormProps as InitialSetupFormPropsType } from '../types';
+import { InitialSetupFormProps as InitialSetupFormPropsType } from '../types';
 import InputField from './InputField';
 import { UserIcon, CalendarDaysIcon, TagIcon } from './icons';
 
