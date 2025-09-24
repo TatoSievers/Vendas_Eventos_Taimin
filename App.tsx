@@ -13,27 +13,27 @@ import PasswordScreen from './components/PasswordScreen';
 
 // --- Helper Functions for Data Mapping ---
 
-// Maps database lowercase keys to application camelCase keys
+// Maps database snake_case keys to application camelCase keys
 const keyMapFromDb: { [key: string]: string } = {
     'id': 'id',
     'created_at': 'created_at',
-    'nomeusuario': 'nomeUsuario',
-    'nomeevento': 'nomeEvento',
-    'dataevento': 'dataEvento',
-    'primeironome': 'primeiroNome',
+    'nome_usuario': 'nomeUsuario',
+    'nome_evento': 'nomeEvento',
+    'data_evento': 'dataEvento',
+    'primeiro_nome': 'primeiroNome',
     'sobrenome': 'sobrenome',
     'cpf': 'cpf',
     'email': 'email',
     'ddd': 'ddd',
-    'telefonenumero': 'telefoneNumero',
-    'logradourorua': 'logradouroRua',
-    'numeroendereco': 'numeroEndereco',
+    'telefone_numero': 'telefoneNumero',
+    'logradouro_rua': 'logradouroRua',
+    'numero_endereco': 'numeroEndereco',
     'complemento': 'complemento',
     'bairro': 'bairro',
     'cidade': 'cidade',
     'estado': 'estado',
     'cep': 'cep',
-    'formapagamento': 'formaPagamento',
+    'forma_pagamento': 'formaPagamento',
     'observacao': 'observacao'
 };
 
@@ -42,7 +42,7 @@ const keyMapToDb = Object.fromEntries(
     Object.entries(keyMapFromDb).map(([dbKey, appKey]) => [appKey, dbKey])
 );
 
-// Converts a single record from database (lowercase keys) to application format (camelCase keys)
+// Converts a single record from database (snake_case keys) to application format (camelCase keys)
 const fromDatabaseRecord = (dbRecord: { [key: string]: any }): { [key: string]: any } => {
     const appRecord: { [key: string]: any } = {};
     for (const dbKey in dbRecord) {
@@ -52,7 +52,7 @@ const fromDatabaseRecord = (dbRecord: { [key: string]: any }): { [key: string]: 
     return appRecord;
 };
 
-// Converts a record from application format (camelCase) to database format (lowercase) using an explicit map
+// Converts a record from application format (camelCase) to database format (snake_case) using an explicit map
 const toDatabaseRecord = (appRecord: { [key: string]: any }): { [key: string]: any } => {
   const dbRecord: { [key: string]: any } = {};
   for (const appKey in appRecord) {
