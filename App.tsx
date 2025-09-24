@@ -158,7 +158,18 @@ const App: React.FC = () => {
         setLightboxMessage({ type: 'success', text: 'Venda atualizada com sucesso!' });
       } catch (error) {
         console.error("Error updating sale:", error);
-        setLightboxMessage({ type: 'error', text: "Erro ao atualizar a venda." });
+        let userMessage = "Erro ao atualizar a venda.";
+        if (error && typeof error === 'object' && 'message' in error) {
+            const dbError = error as { message: string };
+            const errorMessage = dbError.message.toLowerCase();
+            if (errorMessage.includes('not-null constraint')) {
+                const match = errorMessage.match(/column "(.*?)"/);
+                userMessage = `Erro: O campo '${match ? match[1] : 'obrigatório'}' não foi preenchido.`;
+            } else {
+                userMessage = `Erro do banco de dados: ${dbError.message}`;
+            }
+        }
+        setLightboxMessage({ type: 'error', text: userMessage });
       }
     } else {
       try {
@@ -173,7 +184,18 @@ const App: React.FC = () => {
         setLightboxMessage({ type: 'success', text: 'Venda registrada com sucesso!' });
       } catch (error) {
         console.error("Error creating sale:", error);
-        setLightboxMessage({ type: 'error', text: "Erro ao registrar a venda." });
+        let userMessage = "Erro ao registrar a venda.";
+        if (error && typeof error === 'object' && 'message' in error) {
+            const dbError = error as { message: string };
+            const errorMessage = dbError.message.toLowerCase();
+            if (errorMessage.includes('not-null constraint')) {
+                const match = errorMessage.match(/column "(.*?)"/);
+                userMessage = `Erro: O campo '${match ? match[1] : 'obrigatório'}' não foi preenchido.`;
+            } else {
+                userMessage = `Erro do banco de dados: ${dbError.message}`;
+            }
+        }
+        setLightboxMessage({ type: 'error', text: userMessage });
       }
     }
     setEditingSaleId(null);
