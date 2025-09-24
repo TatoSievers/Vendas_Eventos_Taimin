@@ -209,6 +209,13 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
     
     const eventNamesForPdf = Object.keys(salesPerEvent);
     if(eventNamesForPdf.length > 0) {
+        const formatDate = (dateStr: string) => new Date(dateStr).toLocaleString('pt-BR', { timeZone: 'UTC' });
+        const formatDateOnly = (dateStr: string) => {
+            if (!dateStr) return 'N/A';
+            const date = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
+            return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+        };
+        
         eventNamesForPdf.forEach((eventName) => {
             if (yPos > pageHeight - 40) { doc.addPage(); yPos = margin; }
             
@@ -219,38 +226,55 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
 
             const eventSales = filteredSales.filter(s => s.nomeEvento === eventName);
             eventSales.forEach(sale => {
-                const saleBlockHeight = 65 + (sale.produtos.length * 5); 
-                if (yPos + saleBlockHeight > pageHeight - margin) {
+                const saleDataForPdf = [
+                    ['ID da Venda', sale.id],
+                    ['Data do Registro', formatDate(sale.created_at)],
+                    ['Data do Evento', formatDateOnly(sale.dataEvento)],
+                    ['Vendedor(a)', sale.nomeUsuario],
+                    ['Cliente', `${sale.primeiroNome} ${sale.sobrenome}`],
+                    ['CPF', sale.cpf],
+                    ['E-mail', sale.email],
+                    ['Telefone', `(${sale.ddd}) ${sale.telefoneNumero}`],
+                    ['Endereço', `${sale.logradouroRua}, ${sale.numeroEndereco}`],
+                    ['Complemento', sale.complemento || '-'],
+                    ['Bairro', sale.bairro],
+                    ['Cidade/Estado', `${sale.cidade}/${sale.estado}`],
+                    ['CEP', sale.cep],
+                    ['Forma de Pagamento', sale.formaPagamento],
+                    ['Produtos', sale.produtos.map(p => `${p.nomeProduto} (${p.unidades} unid.)`).join('; ')],
+                ];
+
+                if (sale.observacao) {
+                    saleDataForPdf.push(['Observação', sale.observacao]);
+                }
+
+                // Estimate height and check for page break
+                const rowHeight = 7; // Approx height per row in mm
+                const headerHeight = 10;
+                const bottomMargin = 10;
+                const tableHeight = headerHeight + (saleDataForPdf.length * rowHeight) + bottomMargin;
+
+                if (yPos + tableHeight > pageHeight - margin) {
                     doc.addPage();
                     yPos = margin;
                 }
-
-                doc.setDrawColor(200);
-                doc.line(margin, yPos, pageWidth - margin, yPos); // Separator line
-                yPos += 6;
-
-                doc.setFontSize(10);
-                doc.setTextColor(100);
-                
-                const formatDate = (dateStr: string) => new Date(dateStr).toLocaleString('pt-BR');
-                const formatAddress = (s: SalesData) => `${s.logradouroRua}, ${s.numeroEndereco} ${s.complemento ? `(${s.complemento})` : ''} - ${s.bairro}, ${s.cidade}/${s.estado} - CEP: ${s.cep}`;
                 
                 (doc as any).autoTable({
                     startY: yPos,
-                    theme: 'plain',
-                    body: [
-                        [{ content: `Cliente: ${sale.primeiroNome} ${sale.sobrenome} (CPF: ${sale.cpf})`, styles: { fontStyle: 'bold', textColor: 40 } }],
-                        [{ content: `Data da Venda: ${formatDate(sale.created_at)}` }],
-                        [{ content: `Contato: ${sale.email} | (${sale.ddd}) ${sale.telefoneNumero}` }],
-                        [{ content: `Endereço: ${formatAddress(sale)}` }],
-                        [{ content: `Vendedor: ${sale.nomeUsuario} | Pagamento: ${sale.formaPagamento}` }],
-                        [{ content: `Produtos: ${sale.produtos.map(p => `${p.nomeProduto} (${p.unidades})`).join(', ')}`, styles: { cellWidth: 'wrap' } }],
-                        sale.observacao ? [{ content: `Observações: ${sale.observacao}` }] : [],
-                    ],
-                    styles: { fontSize: 9, cellPadding: 1 },
-                    columnStyles: { 0: { cellWidth: pageWidth - (margin * 2) } }
+                    head: [[{ 
+                        content: `Registro de Venda - Cliente: ${sale.primeiroNome} ${sale.sobrenome}`, 
+                        colSpan: 2, 
+                        styles: { halign: 'left', fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold' } 
+                    }]],
+                    body: saleDataForPdf,
+                    theme: 'grid',
+                    styles: { fontSize: 9, cellPadding: 2, overflow: 'linebreak' },
+                    columnStyles: {
+                        0: { fontStyle: 'bold', cellWidth: 45, fillColor: [248, 250, 252] },
+                        1: { cellWidth: 'auto' }
+                    },
                 });
-                yPos = (doc as any).lastAutoTable.finalY + 5;
+                yPos = (doc as any).lastAutoTable.finalY + 10;
             });
             yPos += 5; // Extra space after each event group
         });
