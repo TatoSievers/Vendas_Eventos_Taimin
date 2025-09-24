@@ -127,7 +127,6 @@ export interface SalesFormProps {
     onSaveSale: (saleData: SalesData, isEditing: boolean) => Promise<void>;
     editingSale: SalesData | null;
     onCancelEdit: () => void;
-    uniqueEvents: EventDetail[];
     uniquePaymentMethods: PaymentMethodDetail[];
     allSales: SalesData[];
     currentUser: string;

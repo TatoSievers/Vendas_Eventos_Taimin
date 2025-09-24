@@ -10,7 +10,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     onSaveSale, 
     editingSale,
     onCancelEdit,
-    uniqueEvents, 
     uniquePaymentMethods,
     allSales, 
     currentUser, 
@@ -78,7 +77,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     } else {
       resetFormState();
     }
-  }, [editingSale, isEditing, uniquePaymentMethods, ADD_NEW_SENTINEL]);
+  }, [editingSale, isEditing, uniquePaymentMethods]);
 
   const resetFormState = () => {
     setFormData(getInitialFormState());

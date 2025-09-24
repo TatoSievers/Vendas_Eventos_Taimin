@@ -341,14 +341,14 @@ const App: React.FC = () => {
           <Header
             currentUser={currentUser}
             currentEventName={currentEventName}
-            showUserInfo={currentView !== 'setup'}
+            showUserInfo={true}
             onLogoClick={handleLogoClick}
             onLogout={handleLogout}
           />
           <main className="w-full flex flex-col items-center space-y-8 md:space-y-12">
             {currentView === 'salesFormAndList' && (
               <>
-                <SalesForm onSaveSale={handleSaveSale} editingSale={saleBeingEdited} onCancelEdit={handleCancelEdit} uniqueEvents={uniqueEvents} uniquePaymentMethods={uniquePaymentMethods} allSales={allSales} currentUser={currentUser} currentEventName={currentEventName} currentEventDate={currentEventDate} onGoBackToSetup={navigateToSetup} onNotify={setLightboxMessage} />
+                <SalesForm onSaveSale={handleSaveSale} editingSale={saleBeingEdited} onCancelEdit={handleCancelEdit} uniquePaymentMethods={uniquePaymentMethods} allSales={allSales} currentUser={currentUser} currentEventName={currentEventName} currentEventDate={currentEventDate} onGoBackToSetup={navigateToSetup} onNotify={setLightboxMessage} />
                 <SalesList 
                   sales={filteredSales}
                   allSalesForFilters={allSales}
