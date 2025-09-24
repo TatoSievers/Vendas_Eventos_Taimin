@@ -283,12 +283,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         </button>
       </div>
       
-      <div className="mb-6 p-4 bg-slate-700 rounded-md text-sm">
-        <p><strong className="font-medium text-gray-300">Usuário:</strong> {currentUser}</p>
-        <p><strong className="font-medium text-gray-300">Evento:</strong> {currentEventName}</p>
-        <p><strong className="font-medium text-gray-300">Data:</strong> {currentEventDate ? new Date(currentEventDate + 'T00:00:00').toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'N/A'}</p>
-      </div>
-
       {cepLoading && (
         <div className="p-3 mb-4 rounded-md text-xs bg-sky-500 text-white flex items-center">
             <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

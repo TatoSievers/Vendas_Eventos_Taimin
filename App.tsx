@@ -5,6 +5,7 @@ import SalesList from './components/SalesList';
 import InitialSetupForm from './components/InitialSetupForm';
 import ManagerialDashboard from './components/ManagerialDashboard';
 import Lightbox from './components/Lightbox';
+import Header from './components/Header'; // Importação do novo cabeçalho
 import { SalesData, EventDetail, UserDetail, InitialSetupData, PaymentMethodDetail, LightboxMessage } from './types';
 import { supabase } from './lib/supabaseClient';
 import { DEFAULT_USERS } from './constants';
@@ -85,19 +86,21 @@ const App: React.FC = () => {
         setAllSales(formattedSales);
         
       } catch (error: unknown) {
-        console.error("Error loading sales from Supabase:", error);
+        console.error("Error loading data from Supabase:", error);
         
         let userMessage = "Falha ao carregar os dados. Verifique a conexão com a internet e tente novamente.";
-        if (error && typeof error === 'object' && 'message' in error) {
-            const errorMessage = (error as { message: string }).message;
-            if (errorMessage.toLowerCase().includes('permission denied')) {
-                userMessage = "Erro de permissão ao acessar o banco de dados. Verifique as políticas de segurança (RLS) no Supabase.";
-            } else if (errorMessage.toLowerCase().includes('fetch failed')) {
-                userMessage = "Falha na conexão com o servidor. Verifique sua internet ou o status do serviço Supabase.";
-            } else {
-                 userMessage = `Ocorreu um erro: ${errorMessage}`;
-            }
+        const errorString = String(error).toLowerCase();
+
+        if (errorString.includes('permission denied') || errorString.includes('rls')) {
+            userMessage = "Erro de permissão ao acessar o banco de dados. Verifique se as políticas de segurança (RLS) estão habilitadas e configuradas no Supabase para permitir leitura e escrita.";
+        } else if (errorString.includes('failed to fetch')) {
+            userMessage = "Falha na conexão com o servidor. Verifique sua URL do Supabase, a chave e as configurações de CORS. Certifique-se também de que sua internet está funcionando.";
+        } else if (error && typeof error === 'object' && 'message' in error) {
+            userMessage = `Ocorreu um erro inesperado: ${(error as { message: string }).message}`;
+        } else {
+            userMessage = `Ocorreu um erro inesperado: ${String(error)}`;
         }
+        
         setLightboxMessage({ type: 'error', text: userMessage });
         setAllSales([]);
       } finally {
@@ -280,6 +283,16 @@ const App: React.FC = () => {
     }
   };
 
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setCurrentView('setup');
+    setCurrentUser('');
+    setCurrentEventName('');
+    setCurrentEventDate('');
+    setEditingSaleId(null);
+    setIsDataLoaded(false); // Forçar recarregamento na próxima autenticação
+  };
+
   const saleBeingEdited = editingSaleId ? allSales.find(s => s.id === editingSaleId) || null : null;
   
   // --- Lógica de Renderização ---
@@ -325,16 +338,13 @@ const App: React.FC = () => {
         </main>
       ) : (
         <>
-          <header className="my-6 md:my-8 w-full flex flex-col items-center gap-4 text-center">
-            <button 
-              onClick={handleLogoClick} 
-              title="Voltar" 
-              className={'transition-transform hover:scale-105'}
-            >
-              <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-24 w-auto" />
-            </button>
-            <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight">Vendas Taimin</h1>
-          </header>
+          <Header
+            currentUser={currentUser}
+            currentEventName={currentEventName}
+            showUserInfo={currentView !== 'setup'}
+            onLogoClick={handleLogoClick}
+            onLogout={handleLogout}
+          />
           <main className="w-full flex flex-col items-center space-y-8 md:space-y-12">
             {currentView === 'salesFormAndList' && (
               <>

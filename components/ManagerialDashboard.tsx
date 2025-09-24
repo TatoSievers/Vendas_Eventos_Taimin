@@ -122,7 +122,8 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
           type: 'pie',
           data: {
             labels: Object.keys(salesPerEvent),
-            datasets: [{ label: 'Nº de Vendas', data: Object.values(salesPerEvent).map(e => e.salesCount), backgroundColor: chartColors, hoverOffset: 4 }]
+            // FIX: Explicitly type the parameter `e` to resolve an `unknown` type error.
+            datasets: [{ label: 'Nº de Vendas', data: Object.values(salesPerEvent).map((e: { salesCount: number }) => e.salesCount), backgroundColor: chartColors, hoverOffset: 4 }]
           },
           options: getChartOptions('Vendas por Evento', true)
         });
