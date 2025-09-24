@@ -1,7 +1,7 @@
 
 import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { SalesData, EventDetail, UserDetail } from '../types';
-import { ArrowUturnLeftIcon, DownloadIcon, ChevronDownIcon, UserIcon, CubeIcon, CreditCardIcon, MapPinIcon, CalendarDaysIcon } from './icons';
+import { ArrowUturnLeftIcon, DownloadIcon, UserIcon, CubeIcon, CreditCardIcon, MapPinIcon, CalendarDaysIcon } from './icons';
 import { Chart, registerables } from 'chart.js/auto';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
