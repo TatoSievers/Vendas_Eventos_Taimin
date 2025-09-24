@@ -1,4 +1,5 @@
 
+
 import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { SalesData, EventDetail, UserDetail } from '../types';
 import { ArrowUturnLeftIcon, DownloadIcon, ChevronDownIcon, UserIcon, CubeIcon, CreditCardIcon } from './icons';
@@ -78,7 +79,6 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
       summary[sale.nomeEvento].salesCount += 1;
       summary[sale.nomeEvento].unitsSold += sale.produtos.reduce((sum, p) => sum + p.unidades, 0);
     });
-    // FIX: Add type assertion to resolve 'unknown' type error on destructured variables from Object.entries.
     return Object.fromEntries(Object.entries(summary).sort(([, a], [, b]) => (b as EventSummary[string]).salesCount - (a as EventSummary[string]).salesCount));
   }, [filteredSales]);
 
@@ -89,7 +89,6 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
       summary[sale.nomeUsuario].salesCount += 1;
       summary[sale.nomeUsuario].totalUnitsSold += sale.produtos.reduce((sum, p) => sum + p.unidades, 0);
     });
-    // FIX: Add type assertion to resolve 'unknown' type error on destructured variables from Object.entries.
     return Object.fromEntries(Object.entries(summary).sort(([, a], [, b]) => (b as UserSalesSummary[string]).totalUnitsSold - (a as UserSalesSummary[string]).totalUnitsSold));
   }, [filteredSales]);
 
@@ -122,7 +121,6 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
           type: 'pie',
           data: {
             labels: Object.keys(salesPerEvent),
-            // FIX: Explicitly type the parameter `e` to resolve an `unknown` type error.
             datasets: [{ label: 'Nº de Vendas', data: Object.values(salesPerEvent).map((e: { salesCount: number }) => e.salesCount), backgroundColor: chartColors, hoverOffset: 4 }]
           },
           options: getChartOptions('Vendas por Evento', true)
@@ -138,42 +136,43 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
   const handleDownloadManagerialPdf = async () => {
     const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
-    let yPos = 20;
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    let yPos = margin;
 
-    const addTitle = (title: string) => {
-      doc.setFontSize(22);
-      doc.setTextColor(40);
-      doc.text(title, pageWidth / 2, yPos, { align: 'center' });
-      yPos += 15;
-    };
-    
     const addHeaderFooter = () => {
         for (let i = 1; i <= doc.getNumberOfPages(); i++) {
             doc.setPage(i);
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text('Relatório Gerencial - Vendas Taimin', 10, 10);
-            doc.text(`Página ${i} de ${doc.getNumberOfPages()}`, pageWidth - 25, doc.internal.pageSize.getHeight() - 10);
+            doc.setFontSize(9);
+            doc.setTextColor(120);
+            doc.text('Relatório Gerencial - Vendas Taimin', margin, 10);
+            doc.text(`Página ${i} de ${doc.getNumberOfPages()}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
         }
     };
+
+    // --- PAGE 1: SUMMARY ---
+    doc.setFontSize(22);
+    doc.setTextColor(40);
+    doc.text('Relatório Gerencial de Vendas', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
     
-    addTitle('Relatório Gerencial de Vendas');
-    doc.setFontSize(12);
-    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth / 2, yPos, { align: 'center' });
+    doc.setFontSize(11);
+    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 7;
+    
     if (filterEvent || filterUser) {
-        yPos += 7;
         doc.setFontSize(10);
         doc.setTextColor(100);
-        doc.text(`Filtros: ${filterEvent ? `Evento: ${filterEvent}`: ''} ${filterUser ? `Usuário: ${filterUser}`: ''}`, pageWidth / 2, yPos, { align: 'center' });
+        doc.text(`Filtros Aplicados: ${filterEvent ? `Evento: ${filterEvent}`: ''} ${filterUser ? `Usuário: ${filterUser}`: ''}`, pageWidth / 2, yPos, { align: 'center' });
     }
-    yPos += 13;
+    yPos += 12;
 
     (doc as any).autoTable({
         startY: yPos,
         head: [['Indicador', 'Valor']],
         body: [
-            ['Total de Vendas Registradas', totalSalesCount],
-            ['Total de Unidades Vendidas', totalUnitsSold],
+            ['Total de Vendas Registradas', totalSalesCount.toString()],
+            ['Total de Unidades Vendidas', totalUnitsSold.toString()],
             ['Média de Unidades por Venda', (totalUnitsSold / totalSalesCount || 0).toFixed(2)],
             ['Produto Mais Vendido', topProduct],
         ],
@@ -181,91 +180,86 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
         headStyles: { fillColor: [8, 145, 178] },
     });
     yPos = (doc as any).lastAutoTable.finalY + 15;
-    
-    const addChartToPdf = (chartRef: React.RefObject<HTMLCanvasElement>, title: string) => {
+
+    // --- PAGE 2: CHARTS ---
+    doc.addPage();
+    yPos = margin;
+    doc.setFontSize(16);
+    doc.text('Visualização de Dados', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 15;
+
+    const addChartToPdf = (chartRef: React.RefObject<HTMLCanvasElement>) => {
         if (chartRef.current) {
-            if (yPos + 80 > doc.internal.pageSize.getHeight()) { doc.addPage(); yPos = 20; }
-            doc.setFontSize(16);
-            doc.text(title, 14, yPos);
-            yPos += 10;
-            const imgData = chartRef.current.toDataURL('image/png');
-            doc.addImage(imgData, 'PNG', 14, yPos, 180, 90);
-            yPos += 100;
+            if (yPos + 80 > pageHeight) { doc.addPage(); yPos = margin; }
+            const imgData = chartRef.current.toDataURL('image/png', 1.0);
+            doc.addImage(imgData, 'PNG', margin, yPos, pageWidth - (margin * 2), 100);
+            yPos += 110;
         }
     }
     
+    if (productChartRef.current && Object.keys(salesPerProduct).length > 0) addChartToPdf(productChartRef);
+    if (eventChartRef.current && Object.keys(salesPerEvent).length > 0) addChartToPdf(eventChartRef);
+
+    // --- SUBSEQUENT PAGES: DETAILED SALES ---
     doc.addPage();
-    yPos = 20;
-    addChartToPdf(productChartRef, 'Top 5 Produtos Mais Vendidos');
-    addChartToPdf(eventChartRef, 'Distribuição de Vendas por Evento');
-
-    const addDetailedTable = (title: string, head: any[], body: any[]) => {
-        if (body.length === 0) return;
-        if (yPos + 40 > doc.internal.pageSize.getHeight()) { doc.addPage(); yPos = 20; }
-        doc.setFontSize(16);
-        doc.text(title, 14, yPos);
-        yPos += 10;
-        (doc as any).autoTable({ startY: yPos, head, body, theme: 'striped', headStyles: { fillColor: [8, 145, 178] }});
-        yPos = (doc as any).lastAutoTable.finalY + 15;
-    };
+    yPos = margin;
+    doc.setFontSize(16);
+    doc.text('Detalhamento de Todas as Vendas', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 15;
     
-    addDetailedTable(
-        'Desempenho por Usuário',
-        [['Usuário', 'Vendas Realizadas', 'Unidades Vendidas']],
-        // FIX: Add type assertion to resolve 'unknown' type error on destructured variables from Object.entries.
-        Object.entries(userSalesData).map(([name, data]) => [name, (data as UserSalesSummary[string]).salesCount, (data as UserSalesSummary[string]).totalUnitsSold])
-    );
-    addDetailedTable(
-        'Resumo de Vendas por Evento',
-        [['Evento', 'Nº de Vendas', 'Unidades Vendidas']],
-        // FIX: Add type assertion to resolve 'unknown' type error on destructured variables from Object.entries.
-        Object.entries(salesPerEvent).map(([name, data]) => [name, (data as EventSummary[string]).salesCount, (data as EventSummary[string]).unitsSold])
-    );
-
     const eventNamesForPdf = Object.keys(salesPerEvent);
     if(eventNamesForPdf.length > 0) {
-        doc.addPage();
-        yPos = 20;
-        doc.setFontSize(18);
-        doc.text('Detalhamento de Vendas por Evento', 14, yPos);
-        yPos += 15;
-    
-        eventNamesForPdf.forEach((eventName, index) => {
-            const eventSales = filteredSales.filter(s => s.nomeEvento === eventName);
-            if (eventSales.length === 0) return;
-    
-            const tableBody = eventSales.map(sale => [
-                `${sale.primeiroNome} ${sale.sobrenome}`,
-                sale.produtos.map(p => `${p.nomeProduto} (${p.unidades})`).join('\n'),
-                sale.formaPagamento,
-                sale.nomeUsuario
-            ]);
-    
-            const tableHeight = (tableBody.length + 1) * 10 + 20;
-            if (yPos + tableHeight > doc.internal.pageSize.getHeight() && index > 0) {
-                doc.addPage();
-                yPos = 20;
-            }
+        eventNamesForPdf.forEach((eventName) => {
+            if (yPos > pageHeight - 40) { doc.addPage(); yPos = margin; }
             
             doc.setFontSize(14);
             doc.setTextColor(8, 145, 178);
-            doc.text(eventName, 14, yPos);
+            doc.text(`Evento: ${eventName}`, margin, yPos);
             yPos += 8;
-            doc.setTextColor(40);
-    
-            (doc as any).autoTable({
-                startY: yPos,
-                head: [['Cliente', 'Produtos', 'Pagamento', 'Vendedor']],
-                body: tableBody,
-                theme: 'grid',
-                headStyles: { fillColor: [8, 145, 178] },
+
+            const eventSales = filteredSales.filter(s => s.nomeEvento === eventName);
+            eventSales.forEach(sale => {
+                const saleBlockHeight = 65 + (sale.produtos.length * 5); 
+                if (yPos + saleBlockHeight > pageHeight - margin) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+
+                doc.setDrawColor(200);
+                doc.line(margin, yPos, pageWidth - margin, yPos); // Separator line
+                yPos += 6;
+
+                doc.setFontSize(10);
+                doc.setTextColor(100);
+                
+                const formatDate = (dateStr: string) => new Date(dateStr).toLocaleString('pt-BR');
+                const formatAddress = (s: SalesData) => `${s.logradouroRua}, ${s.numeroEndereco} ${s.complemento ? `(${s.complemento})` : ''} - ${s.bairro}, ${s.cidade}/${s.estado} - CEP: ${s.cep}`;
+                
+                (doc as any).autoTable({
+                    startY: yPos,
+                    theme: 'plain',
+                    body: [
+                        [{ content: `Cliente: ${sale.primeiroNome} ${sale.sobrenome} (CPF: ${sale.cpf})`, styles: { fontStyle: 'bold', textColor: 40 } }],
+                        [{ content: `Data da Venda: ${formatDate(sale.created_at)}` }],
+                        [{ content: `Contato: ${sale.email} | (${sale.ddd}) ${sale.telefoneNumero}` }],
+                        [{ content: `Endereço: ${formatAddress(sale)}` }],
+                        [{ content: `Vendedor: ${sale.nomeUsuario} | Pagamento: ${sale.formaPagamento}` }],
+                        [{ content: `Produtos: ${sale.produtos.map(p => `${p.nomeProduto} (${p.unidades})`).join(', ')}`, styles: { cellWidth: 'wrap' } }],
+                        sale.observacao ? [{ content: `Observações: ${sale.observacao}` }] : [],
+                    ],
+                    styles: { fontSize: 9, cellPadding: 1 },
+                    columnStyles: { 0: { cellWidth: pageWidth - (margin * 2) } }
+                });
+                yPos = (doc as any).lastAutoTable.finalY + 5;
             });
-            yPos = (doc as any).lastAutoTable.finalY + 15;
+            yPos += 5; // Extra space after each event group
         });
+    } else {
+        doc.text('Nenhuma venda encontrada para os filtros selecionados.', pageWidth / 2, yPos, { align: 'center' });
     }
     
     addHeaderFooter();
-    doc.save('Relatorio_Gerencial_Vendas_Taimin.pdf');
+    doc.save('Relatorio_Gerencial_Completo_Taimin.pdf');
   };
 
   const eventNames = useMemo(() => Object.keys(salesPerEvent), [salesPerEvent]);
@@ -330,7 +324,6 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
                       <li key={name} className="flex justify-between items-center p-2 rounded bg-slate-600/50">
                            <span>{name}</span>
                           <span className="text-right">
-                              {/* FIX: Add type assertion to resolve 'unknown' type error on destructured variables from Object.entries. */}
                               {(data as UserSalesSummary[string]).totalUnitsSold} unid. / {(data as UserSalesSummary[string]).salesCount} vendas
                           </span>
                       </li>
