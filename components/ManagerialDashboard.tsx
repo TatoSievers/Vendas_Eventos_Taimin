@@ -2,7 +2,7 @@
 
 import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { SalesData, EventDetail, UserDetail } from '../types';
-import { ArrowUturnLeftIcon, DownloadIcon, ChevronDownIcon, UserIcon, CubeIcon, CreditCardIcon } from './icons';
+import { ArrowUturnLeftIcon, DownloadIcon, ChevronDownIcon, UserIcon, CubeIcon, CreditCardIcon, MapPinIcon, CalendarDaysIcon } from './icons';
 import { Chart, registerables } from 'chart.js/auto';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -94,6 +94,20 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
 
   const productChartRef = useRef<HTMLCanvasElement>(null);
   const eventChartRef = useRef<HTMLCanvasElement>(null);
+
+  const formatDate = (dateString: string | undefined, includeTime = false) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
+    if (includeTime) {
+      return date.toLocaleString('pt-BR', { timeZone: 'UTC' });
+    }
+    return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+  };
+
+  const formatTelefone = (ddd: string | undefined, numero: string | undefined) => {
+    if (!ddd && !numero) return 'N/A';
+    return `(${ddd || ''}) ${numero || ''}`.trim();
+  };
 
   useEffect(() => {
     const chartInstances: Chart[] = [];
@@ -209,8 +223,8 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
     
     const eventNamesForPdf = Object.keys(salesPerEvent);
     if(eventNamesForPdf.length > 0) {
-        const formatDate = (dateStr: string) => new Date(dateStr).toLocaleString('pt-BR', { timeZone: 'UTC' });
-        const formatDateOnly = (dateStr: string) => {
+        const formatDatePdf = (dateStr: string) => new Date(dateStr).toLocaleString('pt-BR', { timeZone: 'UTC' });
+        const formatDateOnlyPdf = (dateStr: string) => {
             if (!dateStr) return 'N/A';
             const date = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
             return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
@@ -228,8 +242,8 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
             eventSales.forEach(sale => {
                 const saleDataForPdf = [
                     ['ID da Venda', sale.id],
-                    ['Data do Registro', formatDate(sale.created_at)],
-                    ['Data do Evento', formatDateOnly(sale.dataEvento)],
+                    ['Data do Registro', formatDatePdf(sale.created_at)],
+                    ['Data do Evento', formatDateOnlyPdf(sale.dataEvento)],
                     ['Vendedor(a)', sale.nomeUsuario],
                     ['Cliente', `${sale.primeiroNome} ${sale.sobrenome}`],
                     ['CPF', sale.cpf],
@@ -368,14 +382,42 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
                         </summary>
                         <div className="border-t border-slate-500 p-4 space-y-4">
                             {filteredSales.filter(s => s.nomeEvento === eventName).map(sale => (
-                                <div key={sale.id} className="bg-slate-700/80 p-3 rounded-md text-sm">
-                                    <p className="font-bold text-white">{sale.primeiroNome} {sale.sobrenome}</p>
-                                    <div className="text-gray-300 mt-2 space-y-1">
-                                      <p className="flex items-center"><CubeIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.produtos.map(p => `${p.nomeProduto} (${p.unidades})`).join(', ')}</p>
-                                      <p className="flex items-center"><CreditCardIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.formaPagamento}</p>
-                                      <p className="flex items-center"><UserIcon className="h-4 w-4 mr-2 text-cyan-400"/> Vendedor(a): {sale.nomeUsuario}</p>
-                                    </div>
-                                </div>
+                                <div key={sale.id} className="bg-slate-700/80 p-4 rounded-md text-sm">
+                                  <div className="flex justify-between items-start gap-4">
+                                      <p className="font-bold text-white text-base">{sale.primeiroNome} {sale.sobrenome}</p>
+                                      <span className="text-xs text-gray-400 text-right flex-shrink-0">{formatDate(sale.created_at, true)}</span>
+                                  </div>
+                                  <div className="text-gray-300 mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                                      <div>
+                                          <p><strong>CPF:</strong> {sale.cpf}</p>
+                                          <p><strong>Email:</strong> {sale.email}</p>
+                                          <p><strong>Telefone:</strong> {formatTelefone(sale.ddd, sale.telefoneNumero)}</p>
+                                      </div>
+                                      <div>
+                                          <p className="flex items-center"><UserIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.nomeUsuario}</p>
+                                          <p className="flex items-center"><CreditCardIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.formaPagamento}</p>
+                                          <p className="flex items-center"><CalendarDaysIcon className="h-4 w-4 mr-2 text-cyan-400"/> Evento em: {formatDate(sale.dataEvento)}</p>
+                                      </div>
+                                      <div className="sm:col-span-2 mt-2">
+                                          <p className="flex items-start"><MapPinIcon className="h-4 w-4 mr-2 mt-0.5 text-cyan-400 flex-shrink-0"/>
+                                          {sale.logradouroRua}, {sale.numeroEndereco} {sale.complemento ? `(${sale.complemento})` : ''} - {sale.bairro}, {sale.cidade}/{sale.estado} - {sale.cep}
+                                          </p>
+                                      </div>
+                                      <div className="sm:col-span-2 mt-2">
+                                          <p className="flex items-start font-semibold text-white mb-1"><CubeIcon className="h-4 w-4 mr-2 mt-0.5"/> Produtos</p>
+                                          <ul className="list-disc list-inside ml-2 text-gray-300">
+                                              {sale.produtos.map(p => (
+                                              <li key={p.nomeProduto}>{p.nomeProduto} ({p.unidades} unid.)</li>
+                                              ))}
+                                          </ul>
+                                      </div>
+                                      {sale.observacao && (
+                                          <div className="sm:col-span-2 mt-2 pt-2 border-t border-slate-600">
+                                              <p><strong>Observação:</strong> {sale.observacao}</p>
+                                          </div>
+                                      )}
+                                  </div>
+                              </div>
                             ))}
                         </div>
                     </details>

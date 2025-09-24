@@ -52,9 +52,13 @@ const SalesList: React.FC<SalesListProps> = ({
   const uniqueEvents = useMemo(() => Array.from(new Set(allSalesForFilters.map(s => s.nomeEvento))).sort(), [allSalesForFilters]);
   const uniqueUsers = useMemo(() => Array.from(new Set(allSalesForFilters.map(s => s.nomeUsuario))).sort(), [allSalesForFilters]);
   
-  const formatDate = (dateString: string | undefined) => {
+  const formatDate = (dateString: string | undefined, includeTime = false) => {
     if (!dateString) return 'N/A';
+    // Handle full ISO strings (from created_at) and date-only strings (from dataEvento)
     const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
+    if (includeTime) {
+        return date.toLocaleString('pt-BR', { timeZone: 'UTC' });
+    }
     return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
   };
   
@@ -172,6 +176,8 @@ const SalesList: React.FC<SalesListProps> = ({
                   </div>
                 </div>
                 
+                <p className="text-xs text-gray-400 mb-3">Registrado em: {formatDate(sale.created_at, true)}</p>
+
                 <div className="space-y-3 text-sm text-gray-300">
                     <p className="flex items-center"><TagIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.nomeEvento}</p>
                     <p className="flex items-center"><CalendarDaysIcon className="h-4 w-4 mr-2 text-cyan-400"/> {formatDate(sale.dataEvento)}</p>
