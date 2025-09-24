@@ -1,5 +1,4 @@
 
-
 import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { SalesData, EventDetail, UserDetail } from '../types';
 import { ArrowUturnLeftIcon, DownloadIcon, ChevronDownIcon, UserIcon, CubeIcon, CreditCardIcon, MapPinIcon, CalendarDaysIcon } from './icons';
@@ -373,13 +372,12 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
        {/* Detalhamento por Evento */}
        <div className="bg-slate-700 p-4 sm:p-6 rounded-lg shadow">
             <h3 className="text-xl font-semibold text-white mb-4">Detalhamento de Vendas por Evento</h3>
-            <div className="space-y-2">
+            <div className="space-y-4">
                 {eventNames.length > 0 ? eventNames.map(eventName => (
-                    <details key={eventName} className="group bg-slate-600/50 rounded-lg">
-                        <summary className="p-3 cursor-pointer text-cyan-300 hover:bg-slate-600 flex justify-between items-center rounded-lg transition-colors">
-                            <span className="font-semibold">{eventName} ({salesPerEvent[eventName].salesCount} vendas)</span>
-                            <ChevronDownIcon className="h-5 w-5 transition-transform duration-300 group-open:rotate-180"/>
-                        </summary>
+                    <div key={eventName} className="bg-slate-600/50 rounded-lg">
+                        <div className="p-3 bg-slate-600 rounded-t-lg">
+                            <h4 className="font-semibold text-cyan-300">{eventName} ({salesPerEvent[eventName].salesCount} vendas)</h4>
+                        </div>
                         <div className="border-t border-slate-500 p-4 space-y-4">
                             {filteredSales.filter(s => s.nomeEvento === eventName).map(sale => (
                                 <div key={sale.id} className="bg-slate-700/80 p-4 rounded-md text-sm">
@@ -420,7 +418,7 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
                               </div>
                             ))}
                         </div>
-                    </details>
+                    </div>
                 )) : <p className="text-gray-400 text-center py-4">Nenhum evento encontrado para os filtros selecionados.</p>}
             </div>
        </div>
