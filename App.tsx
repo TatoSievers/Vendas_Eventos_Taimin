@@ -52,12 +52,17 @@ const App: React.FC = () => {
         }
 
         const saleIds = salesData.map(s => s.id);
-        const { data: productsData, error: productsError } = await supabase
-          .from('sale_products')
-          .select('sale_id, nome_produto, quantidade')
-          .in('sale_id', saleIds);
-            
-        if (productsError) throw productsError;
+        
+        let productsData: { sale_id: string; nome_produto: string; quantidade: number; }[] | null = [];
+        if (saleIds.length > 0) {
+            const { data, error: productsError } = await supabase
+              .from('sale_products')
+              .select('sale_id, nome_produto, quantidade')
+              .in('sale_id', saleIds);
+                
+            if (productsError) throw productsError;
+            productsData = data;
+        }
 
         const productsBySaleId = new Map<string, { nome_produto: string; quantidade: number }[]>();
         if (productsData) {
@@ -79,9 +84,21 @@ const App: React.FC = () => {
 
         setAllSales(formattedSales);
         
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Error loading sales from Supabase:", error);
-        setLightboxMessage({ type: 'error', text: "Falha ao carregar os dados. Verifique a conexão." });
+        
+        let userMessage = "Falha ao carregar os dados. Verifique a conexão com a internet e tente novamente.";
+        if (error && typeof error === 'object' && 'message' in error) {
+            const errorMessage = (error as { message: string }).message;
+            if (errorMessage.toLowerCase().includes('permission denied')) {
+                userMessage = "Erro de permissão ao acessar o banco de dados. Verifique as políticas de segurança (RLS) no Supabase.";
+            } else if (errorMessage.toLowerCase().includes('fetch failed')) {
+                userMessage = "Falha na conexão com o servidor. Verifique sua internet ou o status do serviço Supabase.";
+            } else {
+                 userMessage = `Ocorreu um erro: ${errorMessage}`;
+            }
+        }
+        setLightboxMessage({ type: 'error', text: userMessage });
         setAllSales([]);
       } finally {
         setIsDataLoaded(true);

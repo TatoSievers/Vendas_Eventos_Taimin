@@ -1,4 +1,7 @@
 
+// FIX: Import React to make its types available in this file.
+import React from 'react';
+
 // Este arquivo define os "formatos" ou "modelos" de dados para toda a aplicação.
 
 /**

@@ -78,7 +78,8 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
       summary[sale.nomeEvento].salesCount += 1;
       summary[sale.nomeEvento].unitsSold += sale.produtos.reduce((sum, p) => sum + p.unidades, 0);
     });
-    return Object.fromEntries(Object.entries(summary).sort(([, a], [, b]) => b.salesCount - a.salesCount));
+    // FIX: Add type assertion to resolve 'unknown' type error on destructured variables from Object.entries.
+    return Object.fromEntries(Object.entries(summary).sort(([, a], [, b]) => (b as EventSummary[string]).salesCount - (a as EventSummary[string]).salesCount));
   }, [filteredSales]);
 
   const userSalesData = useMemo<UserSalesSummary>(() => {
@@ -88,7 +89,8 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
       summary[sale.nomeUsuario].salesCount += 1;
       summary[sale.nomeUsuario].totalUnitsSold += sale.produtos.reduce((sum, p) => sum + p.unidades, 0);
     });
-    return Object.fromEntries(Object.entries(summary).sort(([, a], [, b]) => b.totalUnitsSold - a.totalUnitsSold));
+    // FIX: Add type assertion to resolve 'unknown' type error on destructured variables from Object.entries.
+    return Object.fromEntries(Object.entries(summary).sort(([, a], [, b]) => (b as UserSalesSummary[string]).totalUnitsSold - (a as UserSalesSummary[string]).totalUnitsSold));
   }, [filteredSales]);
 
   const productChartRef = useRef<HTMLCanvasElement>(null);
@@ -209,12 +211,14 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
     addDetailedTable(
         'Desempenho por Usuário',
         [['Usuário', 'Vendas Realizadas', 'Unidades Vendidas']],
-        Object.entries(userSalesData).map(([name, data]) => [name, data.salesCount, data.totalUnitsSold])
+        // FIX: Add type assertion to resolve 'unknown' type error on destructured variables from Object.entries.
+        Object.entries(userSalesData).map(([name, data]) => [name, (data as UserSalesSummary[string]).salesCount, (data as UserSalesSummary[string]).totalUnitsSold])
     );
     addDetailedTable(
         'Resumo de Vendas por Evento',
         [['Evento', 'Nº de Vendas', 'Unidades Vendidas']],
-        Object.entries(salesPerEvent).map(([name, data]) => [name, data.salesCount, data.unitsSold])
+        // FIX: Add type assertion to resolve 'unknown' type error on destructured variables from Object.entries.
+        Object.entries(salesPerEvent).map(([name, data]) => [name, (data as EventSummary[string]).salesCount, (data as EventSummary[string]).unitsSold])
     );
 
     const eventNamesForPdf = Object.keys(salesPerEvent);
@@ -325,7 +329,8 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
                       <li key={name} className="flex justify-between items-center p-2 rounded bg-slate-600/50">
                            <span>{name}</span>
                           <span className="text-right">
-                              {data.totalUnitsSold} unid. / {data.salesCount} vendas
+                              {/* FIX: Add type assertion to resolve 'unknown' type error on destructured variables from Object.entries. */}
+                              {(data as UserSalesSummary[string]).totalUnitsSold} unid. / {(data as UserSalesSummary[string]).salesCount} vendas
                           </span>
                       </li>
                   ))}
