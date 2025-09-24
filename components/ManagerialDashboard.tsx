@@ -1,7 +1,8 @@
 
+
 import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { SalesData, EventDetail, UserDetail } from '../types';
-import { ArrowUturnLeftIcon, DownloadIcon, UserIcon, CubeIcon, CreditCardIcon, MapPinIcon, CalendarDaysIcon } from './icons';
+import { ArrowUturnLeftIcon, DownloadIcon, ChevronDownIcon, UserIcon, CubeIcon, CreditCardIcon } from './icons';
 import { Chart, registerables } from 'chart.js/auto';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -93,20 +94,6 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
 
   const productChartRef = useRef<HTMLCanvasElement>(null);
   const eventChartRef = useRef<HTMLCanvasElement>(null);
-
-  const formatDate = (dateString: string | undefined, includeTime = false) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
-    if (includeTime) {
-      return date.toLocaleString('pt-BR', { timeZone: 'UTC' });
-    }
-    return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
-  };
-
-  const formatTelefone = (ddd: string | undefined, numero: string | undefined) => {
-    if (!ddd && !numero) return 'N/A';
-    return `(${ddd || ''}) ${numero || ''}`.trim();
-  };
 
   useEffect(() => {
     const chartInstances: Chart[] = [];
@@ -222,13 +209,6 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
     
     const eventNamesForPdf = Object.keys(salesPerEvent);
     if(eventNamesForPdf.length > 0) {
-        const formatDatePdf = (dateStr: string) => new Date(dateStr).toLocaleString('pt-BR', { timeZone: 'UTC' });
-        const formatDateOnlyPdf = (dateStr: string) => {
-            if (!dateStr) return 'N/A';
-            const date = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
-            return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
-        };
-        
         eventNamesForPdf.forEach((eventName) => {
             if (yPos > pageHeight - 40) { doc.addPage(); yPos = margin; }
             
@@ -239,55 +219,38 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
 
             const eventSales = filteredSales.filter(s => s.nomeEvento === eventName);
             eventSales.forEach(sale => {
-                const saleDataForPdf = [
-                    ['ID da Venda', sale.id],
-                    ['Data do Registro', formatDatePdf(sale.created_at)],
-                    ['Data do Evento', formatDateOnlyPdf(sale.dataEvento)],
-                    ['Vendedor(a)', sale.nomeUsuario],
-                    ['Cliente', `${sale.primeiroNome} ${sale.sobrenome}`],
-                    ['CPF', sale.cpf],
-                    ['E-mail', sale.email],
-                    ['Telefone', `(${sale.ddd}) ${sale.telefoneNumero}`],
-                    ['Endereço', `${sale.logradouroRua}, ${sale.numeroEndereco}`],
-                    ['Complemento', sale.complemento || '-'],
-                    ['Bairro', sale.bairro],
-                    ['Cidade/Estado', `${sale.cidade}/${sale.estado}`],
-                    ['CEP', sale.cep],
-                    ['Forma de Pagamento', sale.formaPagamento],
-                    ['Produtos', sale.produtos.map(p => `${p.nomeProduto} (${p.unidades} unid.)`).join('; ')],
-                ];
-
-                if (sale.observacao) {
-                    saleDataForPdf.push(['Observação', sale.observacao]);
-                }
-
-                // Estimate height and check for page break
-                const rowHeight = 7; // Approx height per row in mm
-                const headerHeight = 10;
-                const bottomMargin = 10;
-                const tableHeight = headerHeight + (saleDataForPdf.length * rowHeight) + bottomMargin;
-
-                if (yPos + tableHeight > pageHeight - margin) {
+                const saleBlockHeight = 65 + (sale.produtos.length * 5); 
+                if (yPos + saleBlockHeight > pageHeight - margin) {
                     doc.addPage();
                     yPos = margin;
                 }
+
+                doc.setDrawColor(200);
+                doc.line(margin, yPos, pageWidth - margin, yPos); // Separator line
+                yPos += 6;
+
+                doc.setFontSize(10);
+                doc.setTextColor(100);
+                
+                const formatDate = (dateStr: string) => new Date(dateStr).toLocaleString('pt-BR');
+                const formatAddress = (s: SalesData) => `${s.logradouroRua}, ${s.numeroEndereco} ${s.complemento ? `(${s.complemento})` : ''} - ${s.bairro}, ${s.cidade}/${s.estado} - CEP: ${s.cep}`;
                 
                 (doc as any).autoTable({
                     startY: yPos,
-                    head: [[{ 
-                        content: `Registro de Venda - Cliente: ${sale.primeiroNome} ${sale.sobrenome}`, 
-                        colSpan: 2, 
-                        styles: { halign: 'left', fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold' } 
-                    }]],
-                    body: saleDataForPdf,
-                    theme: 'grid',
-                    styles: { fontSize: 9, cellPadding: 2, overflow: 'linebreak' },
-                    columnStyles: {
-                        0: { fontStyle: 'bold', cellWidth: 45, fillColor: [248, 250, 252] },
-                        1: { cellWidth: 'auto' }
-                    },
+                    theme: 'plain',
+                    body: [
+                        [{ content: `Cliente: ${sale.primeiroNome} ${sale.sobrenome} (CPF: ${sale.cpf})`, styles: { fontStyle: 'bold', textColor: 40 } }],
+                        [{ content: `Data da Venda: ${formatDate(sale.created_at)}` }],
+                        [{ content: `Contato: ${sale.email} | (${sale.ddd}) ${sale.telefoneNumero}` }],
+                        [{ content: `Endereço: ${formatAddress(sale)}` }],
+                        [{ content: `Vendedor: ${sale.nomeUsuario} | Pagamento: ${sale.formaPagamento}` }],
+                        [{ content: `Produtos: ${sale.produtos.map(p => `${p.nomeProduto} (${p.unidades})`).join(', ')}`, styles: { cellWidth: 'wrap' } }],
+                        sale.observacao ? [{ content: `Observações: ${sale.observacao}` }] : [],
+                    ],
+                    styles: { fontSize: 9, cellPadding: 1 },
+                    columnStyles: { 0: { cellWidth: pageWidth - (margin * 2) } }
                 });
-                yPos = (doc as any).lastAutoTable.finalY + 10;
+                yPos = (doc as any).lastAutoTable.finalY + 5;
             });
             yPos += 5; // Extra space after each event group
         });
@@ -372,53 +335,26 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
        {/* Detalhamento por Evento */}
        <div className="bg-slate-700 p-4 sm:p-6 rounded-lg shadow">
             <h3 className="text-xl font-semibold text-white mb-4">Detalhamento de Vendas por Evento</h3>
-            <div className="space-y-4">
+            <div className="space-y-2">
                 {eventNames.length > 0 ? eventNames.map(eventName => (
-                    <div key={eventName} className="bg-slate-600/50 rounded-lg">
-                        <div className="p-3 bg-slate-600 rounded-t-lg">
-                            <h4 className="font-semibold text-cyan-300">{eventName} ({salesPerEvent[eventName].salesCount} vendas)</h4>
-                        </div>
+                    <details key={eventName} className="group bg-slate-600/50 rounded-lg">
+                        <summary className="p-3 cursor-pointer text-cyan-300 hover:bg-slate-600 flex justify-between items-center rounded-lg transition-colors">
+                            <span className="font-semibold">{eventName} ({salesPerEvent[eventName].salesCount} vendas)</span>
+                            <ChevronDownIcon className="h-5 w-5 transition-transform duration-300 group-open:rotate-180"/>
+                        </summary>
                         <div className="border-t border-slate-500 p-4 space-y-4">
                             {filteredSales.filter(s => s.nomeEvento === eventName).map(sale => (
-                                <div key={sale.id} className="bg-slate-700/80 p-4 rounded-md text-sm">
-                                  <div className="flex justify-between items-start gap-4">
-                                      <p className="font-bold text-white text-base">{sale.primeiroNome} {sale.sobrenome}</p>
-                                      <span className="text-xs text-gray-400 text-right flex-shrink-0">{formatDate(sale.created_at, true)}</span>
-                                  </div>
-                                  <div className="text-gray-300 mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-                                      <div>
-                                          <p><strong>CPF:</strong> {sale.cpf}</p>
-                                          <p><strong>Email:</strong> {sale.email}</p>
-                                          <p><strong>Telefone:</strong> {formatTelefone(sale.ddd, sale.telefoneNumero)}</p>
-                                      </div>
-                                      <div>
-                                          <p className="flex items-center"><UserIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.nomeUsuario}</p>
-                                          <p className="flex items-center"><CreditCardIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.formaPagamento}</p>
-                                          <p className="flex items-center"><CalendarDaysIcon className="h-4 w-4 mr-2 text-cyan-400"/> Evento em: {formatDate(sale.dataEvento)}</p>
-                                      </div>
-                                      <div className="sm:col-span-2 mt-2">
-                                          <p className="flex items-start"><MapPinIcon className="h-4 w-4 mr-2 mt-0.5 text-cyan-400 flex-shrink-0"/>
-                                          {sale.logradouroRua}, {sale.numeroEndereco} {sale.complemento ? `(${sale.complemento})` : ''} - {sale.bairro}, {sale.cidade}/{sale.estado} - {sale.cep}
-                                          </p>
-                                      </div>
-                                      <div className="sm:col-span-2 mt-2">
-                                          <p className="flex items-start font-semibold text-white mb-1"><CubeIcon className="h-4 w-4 mr-2 mt-0.5"/> Produtos</p>
-                                          <ul className="list-disc list-inside ml-2 text-gray-300">
-                                              {sale.produtos.map(p => (
-                                              <li key={p.nomeProduto}>{p.nomeProduto} ({p.unidades} unid.)</li>
-                                              ))}
-                                          </ul>
-                                      </div>
-                                      {sale.observacao && (
-                                          <div className="sm:col-span-2 mt-2 pt-2 border-t border-slate-600">
-                                              <p><strong>Observação:</strong> {sale.observacao}</p>
-                                          </div>
-                                      )}
-                                  </div>
-                              </div>
+                                <div key={sale.id} className="bg-slate-700/80 p-3 rounded-md text-sm">
+                                    <p className="font-bold text-white">{sale.primeiroNome} {sale.sobrenome}</p>
+                                    <div className="text-gray-300 mt-2 space-y-1">
+                                      <p className="flex items-center"><CubeIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.produtos.map(p => `${p.nomeProduto} (${p.unidades})`).join(', ')}</p>
+                                      <p className="flex items-center"><CreditCardIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.formaPagamento}</p>
+                                      <p className="flex items-center"><UserIcon className="h-4 w-4 mr-2 text-cyan-400"/> Vendedor(a): {sale.nomeUsuario}</p>
+                                    </div>
+                                </div>
                             ))}
                         </div>
-                    </div>
+                    </details>
                 )) : <p className="text-gray-400 text-center py-4">Nenhum evento encontrado para os filtros selecionados.</p>}
             </div>
        </div>

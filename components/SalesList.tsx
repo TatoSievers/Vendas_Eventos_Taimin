@@ -1,4 +1,5 @@
 
+
 import React, { useMemo } from 'react';
 import { SalesData } from '../types';
 import { 
@@ -11,11 +12,8 @@ import {
     CalendarDaysIcon,
     CubeIcon,
     CreditCardIcon,
-    MapPinIcon,
-    EmailIcon,
-    PhoneIcon,
-    IdCardIcon,
-    DocumentTextIcon
+    ChevronDownIcon,
+    MapPinIcon
 } from './icons';
 import * as XLSX from 'xlsx';
 
@@ -54,21 +52,15 @@ const SalesList: React.FC<SalesListProps> = ({
   const uniqueEvents = useMemo(() => Array.from(new Set(allSalesForFilters.map(s => s.nomeEvento))).sort(), [allSalesForFilters]);
   const uniqueUsers = useMemo(() => Array.from(new Set(allSalesForFilters.map(s => s.nomeUsuario))).sort(), [allSalesForFilters]);
   
-  const formatDate = (dateString: string | undefined, includeTime = false) => {
+  const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'N/A';
-    // Handle full ISO strings (from created_at) and date-only strings (from dataEvento)
     const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
-    if (isNaN(date.getTime())) return 'Data inválida';
-    if (includeTime) {
-        return date.toLocaleString('pt-BR', { timeZone: 'UTC' });
-    }
     return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
   };
   
   const formatTelefone = (ddd: string | undefined, numero: string | undefined) => {
     if (!ddd && !numero) return 'N/A';
-    const formatted = `(${ddd || ''}) ${numero || ''}`.trim();
-    return formatted === '()' ? 'N/A' : formatted;
+    return `(${ddd || ''}) ${numero || ''}`.trim();
   };
 
   const handleDownloadExcel = () => {
@@ -168,68 +160,50 @@ const SalesList: React.FC<SalesListProps> = ({
 
       {/* Lista de Vendas em Cards */}
       {sales.length > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {sales.map(sale => (
-            <div key={sale.id} className="bg-slate-700 rounded-lg shadow-lg flex flex-col p-5 space-y-4 transition-all duration-300 hover:shadow-primary/20 hover:ring-1 hover:ring-primary-dark">
-              {/* Card Header */}
-              <div className="flex justify-between items-start border-b border-slate-600 pb-3">
-                <div>
-                  <h3 className="text-xl font-bold text-white">{sale.primeiroNome || 'Cliente'} {sale.sobrenome || ''}</h3>
-                  <p className="text-xs text-gray-400">Registrado em: {formatDate(sale.created_at, true)}</p>
+            <div key={sale.id} className="bg-slate-700 rounded-lg shadow-lg flex flex-col transition-all duration-300 hover:shadow-primary/20 hover:ring-1 hover:ring-primary-dark">
+              <div className="p-5 flex-grow">
+                <div className="flex justify-between items-start">
+                  <h3 className="text-xl font-bold text-white mb-2">{sale.primeiroNome} {sale.sobrenome}</h3>
+                  <div className="flex items-center space-x-2">
+                    <button onClick={() => onEditSale(sale.id)} className="text-primary-light hover:text-primary p-1 rounded hover:bg-slate-600" title="Editar"><PencilIcon className="h-4 w-4" /></button>
+                    <button onClick={() => onDeleteSale(sale.id)} className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-slate-600" title="Excluir"><TrashIcon className="h-4 w-4" /></button>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2 flex-shrink-0">
-                  <button onClick={() => onEditSale(sale.id)} className="text-primary-light hover:text-primary p-1 rounded hover:bg-slate-600" title="Editar"><PencilIcon className="h-5 w-5" /></button>
-                  <button onClick={() => onDeleteSale(sale.id)} className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-slate-600" title="Excluir"><TrashIcon className="h-5 w-5" /></button>
+                
+                <div className="space-y-3 text-sm text-gray-300">
+                    <p className="flex items-center"><TagIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.nomeEvento}</p>
+                    <p className="flex items-center"><CalendarDaysIcon className="h-4 w-4 mr-2 text-cyan-400"/> {formatDate(sale.dataEvento)}</p>
+                    <p className="flex items-center"><UserIcon className="h-4 w-4 mr-2 text-cyan-400"/> Vendedor(a): {sale.nomeUsuario}</p>
+                    <p className="flex items-center"><CreditCardIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.formaPagamento}</p>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-slate-600">
+                  <h4 className="font-semibold text-white mb-2 flex items-center"><CubeIcon className="h-4 w-4 mr-2"/> Produtos</h4>
+                  <ul className="list-disc list-inside text-sm text-gray-300 space-y-1">
+                    {sale.produtos.map(p => (
+                      <li key={p.nomeProduto}>{p.nomeProduto} ({p.unidades} unid.)</li>
+                    ))}
+                  </ul>
                 </div>
               </div>
 
-              {/* Card Body with all details */}
-              <div className="space-y-4 text-sm text-gray-300">
-                {/* Sale Details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
-                  <p className="flex items-center"><TagIcon className="h-4 w-4 mr-2 text-cyan-400"/> Evento: <strong className="ml-1">{sale.nomeEvento || 'N/A'}</strong></p>
-                  <p className="flex items-center"><CalendarDaysIcon className="h-4 w-4 mr-2 text-cyan-400"/> Data: <strong className="ml-1">{formatDate(sale.dataEvento)}</strong></p>
-                  <p className="flex items-center"><UserIcon className="h-4 w-4 mr-2 text-cyan-400"/> Vendedor(a): <strong className="ml-1">{sale.nomeUsuario || 'N/A'}</strong></p>
-                  <p className="flex items-center"><CreditCardIcon className="h-4 w-4 mr-2 text-cyan-400"/> Pagamento: <strong className="ml-1">{sale.formaPagamento || 'N/A'}</strong></p>
+              <details className="group">
+                <summary className="p-3 bg-slate-600/50 cursor-pointer text-sm text-cyan-300 hover:bg-slate-600 flex justify-between items-center rounded-b-lg">
+                  Ver Detalhes
+                  <ChevronDownIcon className="h-5 w-5 transition-transform duration-300 group-open:rotate-180"/>
+                </summary>
+                <div className="p-5 bg-slate-700/50 border-t border-slate-600 rounded-b-lg text-sm text-gray-300 space-y-2">
+                    <p><strong>CPF:</strong> {sale.cpf}</p>
+                    <p><strong>Email:</strong> {sale.email}</p>
+                    <p><strong>Telefone:</strong> {formatTelefone(sale.ddd, sale.telefoneNumero)}</p>
+                    <p className="flex items-start"><MapPinIcon className="h-4 w-4 mr-2 mt-0.5 text-cyan-400 flex-shrink-0"/> 
+                        {sale.logradouroRua}, {sale.numeroEndereco} {sale.complemento ? `(${sale.complemento})` : ''} - {sale.bairro}, {sale.cidade} - {sale.estado}, {sale.cep}
+                    </p>
+                    {sale.observacao && <p><strong>Observação:</strong> {sale.observacao}</p>}
                 </div>
-
-                {/* Customer Contact */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 pt-3 border-t border-slate-600">
-                  <p className="flex items-center"><IdCardIcon className="h-4 w-4 mr-2 text-cyan-400"/> CPF: {sale.cpf || 'N/A'}</p>
-                  <p className="flex items-center"><PhoneIcon className="h-4 w-4 mr-2 text-cyan-400"/> Telefone: {formatTelefone(sale.ddd, sale.telefoneNumero)}</p>
-                  <p className="md:col-span-2 flex items-center break-all"><EmailIcon className="h-4 w-4 mr-2 text-cyan-400 flex-shrink-0"/> Email: {sale.email || 'N/A'}</p>
-                </div>
-                
-                {/* Address */}
-                <div className="pt-3 border-t border-slate-600">
-                  <p className="flex items-start"><MapPinIcon className="h-4 w-4 mr-2 mt-0.5 text-cyan-400 flex-shrink-0"/> 
-                      <span className="flex-1">
-                          {sale.logradouroRua || 'N/A'}, {sale.numeroEndereco || 'S/N'} {sale.complemento ? `(${sale.complemento})` : ''}<br/>
-                          {sale.bairro || 'N/A'}, {sale.cidade || 'N/A'} - {sale.estado || 'N/A'}, {sale.cep || 'N/A'}
-                      </span>
-                  </p>
-                </div>
-                
-                {/* Products */}
-                <div className="pt-3 border-t border-slate-600">
-                    <h4 className="font-semibold text-white mb-2 flex items-center"><CubeIcon className="h-4 w-4 mr-2"/> Produtos Vendidos</h4>
-                    <ul className="list-disc list-inside space-y-1 pl-2">
-                        {sale.produtos.length > 0 ? sale.produtos.map(p => (
-                            <li key={p.nomeProduto}>{p.nomeProduto} ({p.unidades} unid.)</li>
-                        )) : <li>Nenhum produto registrado.</li>}
-                    </ul>
-                </div>
-
-                {/* Observation */}
-                {sale.observacao && (
-                    <div className="pt-3 border-t border-slate-600">
-                        <p className="flex items-start"><DocumentTextIcon className="h-4 w-4 mr-2 mt-0.5 text-cyan-400 flex-shrink-0"/> 
-                          <strong>Observação:</strong>
-                          <span className="ml-2 font-light flex-1">{sale.observacao}</span>
-                        </p>
-                    </div>
-                )}
-              </div>
+              </details>
             </div>
           ))}
         </div>
