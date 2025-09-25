@@ -3,11 +3,14 @@ import SalesForm from './components/SalesForm';
 import InitialSetupForm from './components/InitialSetupForm';
 import Lightbox from './components/Lightbox';
 import Header from './components/Header';
-import { SalesData, EventDetail, UserDetail, InitialSetupData, PaymentMethodDetail, LightboxMessage } from './types';
+import { SalesData, EventDetail, UserDetail, InitialSetupData, LightboxMessage, ProdutoInfo } from './types';
 import PasswordScreen from './components/PasswordScreen';
+import { PRODUTOS_TAIMIN, PAYMENT_METHODS } from './constants';
+import PasswordPrompt from './components/PasswordPrompt';
 
 const ManagerialDashboard = lazy(() => import('./components/ManagerialDashboard'));
 const SalesList = lazy(() => import('./components/SalesList'));
+const ProductManager = lazy(() => import('./components/ProductManager'));
 
 
 // --- Funções Auxiliares para Armazenamento Local ---
@@ -31,7 +34,7 @@ const App: React.FC = () => {
   const [allSales, setAllSales] = useState<SalesData[]>(() => loadFromLocalStorage('salesData', []));
   const [appUsers, setAppUsers] = useState<UserDetail[]>(() => loadFromLocalStorage('appUsers', []));
   const [appEvents, setAppEvents] = useState<EventDetail[]>(() => loadFromLocalStorage('appEvents', []));
-  const [appPaymentMethods, setAppPaymentMethods] = useState<PaymentMethodDetail[]>(() => loadFromLocalStorage('appPaymentMethods', []));
+  const [appProducts, setAppProducts] = useState<ProdutoInfo[]>(() => loadFromLocalStorage('appProducts', PRODUTOS_TAIMIN));
 
   const [currentView, setCurrentView] = useState<AppView>('setup');
   const [currentUser, setCurrentUser] = useState<string>('');
@@ -44,6 +47,8 @@ const App: React.FC = () => {
   const [filterUser, setFilterUser] = useState('');
 
   const [lightboxMessage, setLightboxMessage] = useState<LightboxMessage | null>(null);
+  const [isProductManagerOpen, setIsProductManagerOpen] = useState<boolean>(false);
+  const [isProductManagerPasswordPromptOpen, setIsProductManagerPasswordPromptOpen] = useState<boolean>(false);
   
   // Hardcoded password to ensure the app runs in any environment without a build step.
   const appPassword = '12';
@@ -52,7 +57,7 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem('salesData', JSON.stringify(allSales)); }, [allSales]);
   useEffect(() => { localStorage.setItem('appUsers', JSON.stringify(appUsers)); }, [appUsers]);
   useEffect(() => { localStorage.setItem('appEvents', JSON.stringify(appEvents)); }, [appEvents]);
-  useEffect(() => { localStorage.setItem('appPaymentMethods', JSON.stringify(appPaymentMethods)); }, [appPaymentMethods]);
+  useEffect(() => { localStorage.setItem('appProducts', JSON.stringify(appProducts)); }, [appProducts]);
 
 
   const handleInitialSetupComplete = (setupData: InitialSetupData) => {
@@ -71,11 +76,6 @@ const App: React.FC = () => {
   const handleCreateEvent = async (name: string, date: string) => {
       if (appEvents.some(e => e.name.trim().toLowerCase() === name.trim().toLowerCase())) return; // Ignore duplicates
       setAppEvents(prev => [...prev, { name, date }]);
-  };
-
-  const handleCreatePaymentMethod = async (name: string) => {
-      if (appPaymentMethods.some(pm => pm.name.trim().toLowerCase() === name.trim().toLowerCase())) return; // Ignore duplicates
-      setAppPaymentMethods(prev => [...prev, { name }]);
   };
 
   const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
@@ -126,6 +126,19 @@ const App: React.FC = () => {
         setLightboxMessage({ type: 'error', text: 'Ocorreu um erro ao excluir o evento.' });
     }
   };
+
+  const handleSaveProduct = async (product: ProdutoInfo, originalName?: string) => {
+    setAppProducts(prev => {
+        const updated = originalName
+            ? prev.map(p => p.name === originalName ? product : p)
+            : [...prev, product];
+        return updated.sort((a, b) => a.name.localeCompare(b.name));
+    });
+  };
+
+  const handleDeleteProduct = async (productName: string) => {
+      setAppProducts(prev => prev.filter(p => p.name !== productName));
+  };
   
   const handleSetEditingSale = (saleId: string | null) => {
     if (saleId) {
@@ -152,9 +165,6 @@ const App: React.FC = () => {
     return [...appUsers].sort((a, b) => a.name.localeCompare(b.name));
   }, [appUsers]);
 
-  const uniquePaymentMethods = useMemo<PaymentMethodDetail[]>(() => {
-    return [...appPaymentMethods].sort((a, b) => a.name.localeCompare(b.name));
-  }, [appPaymentMethods]);
   
   const filteredSales = useMemo(() => {
     return allSales.filter(sale => {
@@ -191,6 +201,11 @@ const App: React.FC = () => {
     setCurrentView('setup');
   };
 
+  const handleProductManagerPasswordSuccess = () => {
+    setIsProductManagerPasswordPromptOpen(false);
+    setIsProductManagerOpen(true);
+  }
+
   const saleBeingEdited = editingSaleId ? allSales.find(s => s.id === editingSaleId) || null : null;
   
   if (!appPassword) {
@@ -211,6 +226,24 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col p-4 bg-gradient-to-br from-slate-900 to-slate-700 text-gray-200">
+      {isProductManagerPasswordPromptOpen && (
+        <PasswordPrompt 
+          onClose={() => setIsProductManagerPasswordPromptOpen(false)}
+          onSuccess={handleProductManagerPasswordSuccess}
+          appPassword={appPassword}
+        />
+      )}
+      {isProductManagerOpen && (
+        <Suspense fallback={<div>Carregando...</div>}>
+          <ProductManager
+            products={appProducts}
+            onSave={handleSaveProduct}
+            onDelete={handleDeleteProduct}
+            onClose={() => setIsProductManagerOpen(false)}
+            onNotify={setLightboxMessage}
+          />
+        </Suspense>
+      )}
       {currentView === 'setup' ? (
         <main className="w-full flex-grow flex flex-col items-center justify-center text-center">
           <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-24 w-auto mb-4" />
@@ -221,6 +254,7 @@ const App: React.FC = () => {
             uniqueUsers={uniqueUsers}
             onCreateUser={handleCreateUser}
             onCreateEvent={handleCreateEvent}
+            onOpenProductManager={() => setIsProductManagerPasswordPromptOpen(true)}
           />
         </main>
       ) : (
@@ -239,14 +273,14 @@ const App: React.FC = () => {
                   onSaveSale={handleSaveSale} 
                   editingSale={saleBeingEdited} 
                   onCancelEdit={handleCancelEdit} 
-                  uniquePaymentMethods={uniquePaymentMethods} 
-                  allSales={allSales} 
+                  paymentMethods={PAYMENT_METHODS}
+                  allSales={allSales}
+                  appProducts={appProducts}
                   currentUser={currentUser} 
                   currentEventName={currentEventName} 
                   currentEventDate={currentEventDate} 
                   onGoBackToSetup={navigateToSetup} 
                   onNotify={setLightboxMessage} 
-                  onCreatePaymentMethod={handleCreatePaymentMethod}
                 />
                 <Suspense fallback={
                   <div className="w-full max-w-4xl bg-slate-800 p-8 rounded-xl shadow-2xl text-center">

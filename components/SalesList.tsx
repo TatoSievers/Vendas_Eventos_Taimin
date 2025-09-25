@@ -1,5 +1,3 @@
-
-
 import React, { useMemo } from 'react';
 import { SalesData } from '../types';
 import { 
@@ -62,6 +60,10 @@ const SalesList: React.FC<SalesListProps> = ({
     if (!ddd && !numero) return 'N/A';
     return `(${ddd || ''}) ${numero || ''}`.trim();
   };
+  
+  const formatCurrency = (value: number) => {
+    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
 
   const handleDownloadExcel = () => {
     if (sales.length === 0) {
@@ -88,12 +90,25 @@ const SalesList: React.FC<SalesListProps> = ({
             'Estado': sale.estado,
             'CEP': sale.cep,
             'Forma de Pagamento': sale.formaPagamento,
+            'Valor Total': sale.valorTotal,
             'Produtos': productString,
             'Observação': sale.observacao || '-',
         };
     });
 
-    const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
+    const worksheet = XLSX.utils.json_to_sheet(dataForExcel, { cellDates: true });
+    
+    // Set number format for currency
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+        const cell_address = { c: 16, r: R }; // 16 is the index for 'Valor Total'
+        const cell = XLSX.utils.encode_cell(cell_address);
+        if (worksheet[cell]) {
+            worksheet[cell].t = 'n';
+            worksheet[cell].z = '"R$" #,##0.00';
+        }
+    }
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Vendas");
     const colsWidth = Object.keys(dataForExcel[0] || {}).map(key => ({ wch: Math.max(key.length, 20) }));
@@ -165,14 +180,17 @@ const SalesList: React.FC<SalesListProps> = ({
             <div key={sale.id} className="bg-slate-700 rounded-lg shadow-lg flex flex-col transition-all duration-300 hover:shadow-primary/20 hover:ring-1 hover:ring-primary-dark">
               <div className="p-5 flex-grow">
                 <div className="flex justify-between items-start">
-                  <h3 className="text-xl font-bold text-white mb-2">{sale.primeiroNome} {sale.sobrenome}</h3>
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-1">{sale.primeiroNome} {sale.sobrenome}</h3>
+                    <p className="text-lg font-semibold text-green-400">{formatCurrency(sale.valorTotal)}</p>
+                  </div>
                   <div className="flex items-center space-x-2">
                     <button onClick={() => onEditSale(sale.id)} className="text-primary-light hover:text-primary p-1 rounded hover:bg-slate-600" title="Editar"><PencilIcon className="h-4 w-4" /></button>
                     <button onClick={() => onDeleteSale(sale.id)} className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-slate-600" title="Excluir"><TrashIcon className="h-4 w-4" /></button>
                   </div>
                 </div>
                 
-                <div className="space-y-3 text-sm text-gray-300">
+                <div className="space-y-3 text-sm text-gray-300 mt-4">
                     <p className="flex items-center"><TagIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.nomeEvento}</p>
                     <p className="flex items-center"><CalendarDaysIcon className="h-4 w-4 mr-2 text-cyan-400"/> {formatDate(sale.dataEvento)}</p>
                     <p className="flex items-center"><UserIcon className="h-4 w-4 mr-2 text-cyan-400"/> Vendedor(a): {sale.nomeUsuario}</p>

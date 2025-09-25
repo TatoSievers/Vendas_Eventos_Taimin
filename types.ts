@@ -8,7 +8,7 @@ import React from 'react';
 export interface ProductDetail {
   nomeProduto: string;
   unidades: number;
-  preco_unitario?: number; // Opcional por enquanto
+  preco_unitario: number; 
 }
 
 /**
@@ -43,7 +43,8 @@ export interface SalesData {
   
   // Detalhes da Venda
   formaPagamento: string;
-  observacao?: string | null; // <-- Campo adicionado/confirmado
+  valorTotal: number;
+  observacao?: string | null;
 
   // Lista de produtos nesta venda
   produtos: ProductDetail[];
@@ -104,6 +105,7 @@ export interface InputFieldProps {
   maxLength?: number;
   pattern?: string;
   min?: number;
+  step?: string;
 }
 
 export interface TextAreaFieldProps {
@@ -122,14 +124,14 @@ export interface SalesFormProps {
     onSaveSale: (saleData: SalesData, isEditing: boolean) => Promise<void>;
     editingSale: SalesData | null;
     onCancelEdit: () => void;
-    uniquePaymentMethods: PaymentMethodDetail[];
+    paymentMethods: readonly string[];
     allSales: SalesData[];
+    appProducts: ProdutoInfo[];
     currentUser: string;
     currentEventName: string;
     currentEventDate: string;
     onGoBackToSetup: () => void;
     onNotify: (message: LightboxMessage) => void;
-    onCreatePaymentMethod: (name: string) => Promise<void>;
 }
 
 export interface InitialSetupFormProps {
@@ -138,9 +140,20 @@ export interface InitialSetupFormProps {
   uniqueUsers: UserDetail[];
   onCreateUser: (name: string) => Promise<void>;
   onCreateEvent: (name: string, date: string) => Promise<void>;
+  onOpenProductManager: () => void;
 }
 
 
 export interface ProdutoInfo {
   name: string;
+  preco: number;
+  status: 'disponível' | 'indisponível';
+}
+
+export interface ProductManagerProps {
+  products: ProdutoInfo[];
+  onSave: (product: ProdutoInfo, originalName?: string) => Promise<void>;
+  onDelete: (productName: string) => Promise<void>;
+  onClose: () => void;
+  onNotify: (message: LightboxMessage) => void;
 }

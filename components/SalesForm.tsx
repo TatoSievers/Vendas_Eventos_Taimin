@@ -1,26 +1,22 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { SalesData, ProductDetail, SalesFormProps as SalesFormPropsType } from '../types';
 import InputField from './InputField';
 import { UserIcon, IdCardIcon, EmailIcon, PhoneIcon, MapPinIcon, CreditCardIcon, CubeIcon, TrashIcon, BuildingOfficeIcon, ArrowUturnLeftIcon } from './icons';
-import { PRODUTOS_TAIMIN } from '../constants';
 
 
 const SalesForm: React.FC<SalesFormPropsType> = ({ 
     onSaveSale, 
     editingSale,
     onCancelEdit,
-    uniquePaymentMethods,
-    allSales, 
+    paymentMethods,
+    allSales,
+    appProducts,
     currentUser, 
     currentEventName, 
     currentEventDate,
     onGoBackToSetup,
-    onNotify,
-    onCreatePaymentMethod
+    onNotify
 }) => {
-  const ADD_NEW_SENTINEL = "ADD_NEW_SENTINEL_VALUE";
   const getInitialFormState = (): SalesData => ({
     primeiroNome: '',
     sobrenome: '',
@@ -36,6 +32,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     estado: '',
     cep: '',
     formaPagamento: '',
+    valorTotal: 0,
     id: '',
     created_at: '',
     nomeUsuario: currentUser,
@@ -49,9 +46,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
   const [selectedProducts, setSelectedProducts] = useState<ProductDetail[]>([]);
   const [currentProduct, setCurrentProduct] = useState<string>('');
   const [currentUnits, setCurrentUnits] = useState<number | string>(1);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
-  const [newPaymentMethodName, setNewPaymentMethodName] = useState<string>('');
-  const [showNewPaymentMethodInput, setShowNewPaymentMethodInput] = useState<boolean>(false);
+  const [totalVenda, setTotalVenda] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const isEditing = !!editingSale;
@@ -60,36 +55,25 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     if (isEditing && editingSale) {
       setFormData(editingSale);
       setSelectedProducts(editingSale.produtos || []);
-      
-      const isExistingPM = uniquePaymentMethods.some(pm => pm.name === editingSale.formaPagamento);
-      if (isExistingPM) {
-        setSelectedPaymentMethod(editingSale.formaPagamento);
-        setShowNewPaymentMethodInput(false);
-      } else if (editingSale.formaPagamento) { 
-        setSelectedPaymentMethod(ADD_NEW_SENTINEL); 
-        setShowNewPaymentMethodInput(true);
-        setNewPaymentMethodName(editingSale.formaPagamento);
-      } else {
-        setSelectedPaymentMethod('');
-        setShowNewPaymentMethodInput(false);
-      }
     } else {
       resetFormState();
     }
-  }, [editingSale, isEditing, uniquePaymentMethods, currentUser, currentEventName, currentEventDate]);
+  }, [editingSale, isEditing, currentUser, currentEventName, currentEventDate]);
+  
+  useEffect(() => {
+    const total = selectedProducts.reduce((sum, p) => sum + (p.preco_unitario * p.unidades), 0);
+    setTotalVenda(total);
+  }, [selectedProducts]);
 
   const resetFormState = () => {
     setFormData(getInitialFormState());
     setSelectedProducts([]);
     setCurrentProduct('');
     setCurrentUnits(1);
-    setSelectedPaymentMethod('');
-    setNewPaymentMethodName('');
-    setShowNewPaymentMethodInput(false);
     setCepLoading(false);
   };
   
-    const handleCancel = () => {
+  const handleCancel = () => {
     onCancelEdit(); 
     resetFormState(); 
   };
@@ -102,10 +86,36 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     return isValid || !dddValue;
   };
 
+  const formatCPF = (value: string): string => {
+    const onlyDigits = value.replace(/\D/g, '').slice(0, 11);
+    let formatted = onlyDigits;
+    if (onlyDigits.length > 3) {
+      formatted = `${onlyDigits.slice(0, 3)}.${onlyDigits.slice(3)}`;
+    }
+    if (onlyDigits.length > 6) {
+      formatted = `${onlyDigits.slice(0, 3)}.${onlyDigits.slice(3, 6)}.${onlyDigits.slice(6)}`;
+    }
+    if (onlyDigits.length > 9) {
+      formatted = `${onlyDigits.slice(0, 3)}.${onlyDigits.slice(3, 6)}.${onlyDigits.slice(6, 9)}-${onlyDigits.slice(9)}`;
+    }
+    return formatted;
+  };
+
+  const validateCPF = (cpf: string): boolean => {
+    const requiredCpfPattern = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
+    if (cpf && !requiredCpfPattern.test(cpf)) {
+        onNotify({ type: 'error', text: 'Formato de CPF inválido. O formato correto é XXX.XXX.XXX-XX.' });
+        return false;
+    }
+    return true;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
-    if (name === 'ddd') {
+    if (name === 'cpf') {
+      setFormData(prevData => ({ ...prevData, [name]: formatCPF(value) }));
+    } else if (name === 'ddd') {
       const numericValue = value.replace(/\D/g, '');
       setFormData(prevData => ({ ...prevData, [name]: numericValue }));
     } else {
@@ -119,29 +129,15 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     }
   };
 
-  const handlePaymentMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    if (value === ADD_NEW_SENTINEL) {
-      setShowNewPaymentMethodInput(true);
-      setSelectedPaymentMethod(ADD_NEW_SENTINEL); 
-      setNewPaymentMethodName('');
-      setFormData(prev => ({ ...prev, formaPagamento: '' })); 
-    } else {
-      setShowNewPaymentMethodInput(false);
-      setSelectedPaymentMethod(value);
-      setFormData(prev => ({ ...prev, formaPagamento: value }));
-    }
-  };
-  
-  const handleNewPaymentMethodNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newName = e.target.value;
-    setNewPaymentMethodName(newName);
-    setFormData(prev => ({ ...prev, formaPagamento: newName.trim() }));
-  };
-
   const handleCPFBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    if (isEditing) return; 
     const cpf = e.target.value;
+
+    if (!validateCPF(cpf)) {
+        return;
+    }
+
+    if (isEditing) return; 
+    
     if (cpf && allSales.length > 0) {
       const existingSale = [...allSales].reverse().find(sale => sale.cpf === cpf);
       if (existingSale) {
@@ -204,6 +200,12 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
       onNotify({ type: 'error', text: 'Selecione um produto e uma quantidade válida.' });
       return;
     }
+    
+    const productInfo = appProducts.find(p => p.name === currentProduct);
+    if (!productInfo) {
+      onNotify({ type: 'error', text: 'Produto selecionado não encontrado.' });
+      return;
+    }
 
     setSelectedProducts(prev => {
         const existingProductIndex = prev.findIndex(p => p.nomeProduto === currentProduct);
@@ -212,7 +214,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
             updatedProducts[existingProductIndex].unidades += units;
             return updatedProducts;
         }
-        return [...prev, { nomeProduto: currentProduct, unidades: units }];
+        return [...prev, { nomeProduto: currentProduct, unidades: units, preco_unitario: productInfo.preco }];
     });
     setCurrentProduct('');
     setCurrentUnits(1);
@@ -231,33 +233,31 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
       return;
     }
 
+    if (!validateCPF(formData.cpf)) {
+        setIsSubmitting(false);
+        return;
+    }
+
     if (selectedProducts.length === 0) {
         onNotify({ type: 'error', text: 'Adicione pelo menos um produto.' });
         setIsSubmitting(false);
         return;
     }
     
-    const finalPaymentMethod = showNewPaymentMethodInput ? newPaymentMethodName.trim() : selectedPaymentMethod;
-
-    if (!finalPaymentMethod) {
+    if (!formData.formaPagamento) {
         onNotify({ type: 'error', text: 'Selecione uma forma de pagamento.' });
         setIsSubmitting(false);
         return;
     }
 
     try {
-      // Salva a nova forma de pagamento no banco de dados ANTES de salvar a venda
-      if (showNewPaymentMethodInput && finalPaymentMethod) {
-        await onCreatePaymentMethod(finalPaymentMethod);
-      }
-      
       const salePayload: SalesData = {
         ...formData,
         nomeUsuario: currentUser,
         nomeEvento: currentEventName,
         dataEvento: currentEventDate,
-        formaPagamento: finalPaymentMethod,
         produtos: selectedProducts,
+        valorTotal: totalVenda,
       };
   
       if (isEditing && editingSale) {
@@ -271,12 +271,13 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
           resetFormState(); 
       }
     } catch (error: any) {
-      onNotify({type: 'error', text: error.message || 'Falha ao salvar a forma de pagamento.' });
+      onNotify({type: 'error', text: error.message || 'Falha ao salvar a venda.' });
     } finally {
       setIsSubmitting(false);
     }
   };
     
+  const availableProducts = appProducts.filter(p => p.status === 'disponível');
 
   return (
     <div className="w-full max-w-3xl bg-slate-800 p-6 md:p-10 rounded-xl shadow-2xl">
@@ -309,7 +310,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
           <InputField label="Primeiro Nome" id="primeiroNome" name="primeiroNome" value={formData.primeiroNome} onChange={handleChange} required Icon={UserIcon}/>
           <InputField label="Sobrenome" id="sobrenome" name="sobrenome" value={formData.sobrenome} onChange={handleChange} required Icon={UserIcon}/>
         </div>
-        <InputField label="CPF" id="cpf" name="cpf" value={formData.cpf} onChange={handleChange} onBlur={handleCPFBlur} required Icon={IdCardIcon} readOnly={isEditing}/>
+        <InputField label="CPF" id="cpf" name="cpf" value={formData.cpf} onChange={handleChange} onBlur={handleCPFBlur} required Icon={IdCardIcon} readOnly={isEditing} maxLength={14} />
         <InputField label="E-mail" id="email" name="email" type="email" value={formData.email} onChange={handleChange} required Icon={EmailIcon}/>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6">
           <InputField label="DDD" id="ddd" name="ddd" value={formData.ddd} onChange={handleChange} onBlur={handleDddBlur} required Icon={PhoneIcon} maxLength={2} pattern="\d{2}"/>
@@ -331,24 +332,21 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         
         <h3 className="text-xl font-semibold text-gray-200 pt-4 pb-2 border-b border-slate-700">Detalhes da Venda</h3>
         <div className="mb-6">
-          <label htmlFor="paymentMethodSelector" className="block text-sm font-medium text-gray-300 mb-1">Forma de Pagamento <span className="text-red-500">*</span></label>
+          <label htmlFor="formaPagamento" className="block text-sm font-medium text-gray-300 mb-1">Forma de Pagamento <span className="text-red-500">*</span></label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10"><CreditCardIcon className="h-5 w-5 text-gray-400" /></div>
             <select
-              id="paymentMethodSelector"
-              value={showNewPaymentMethodInput ? ADD_NEW_SENTINEL : selectedPaymentMethod}
-              onChange={handlePaymentMethodChange}
-              required={!showNewPaymentMethodInput && !formData.formaPagamento}
+              id="formaPagamento"
+              name="formaPagamento"
+              value={formData.formaPagamento}
+              onChange={handleChange}
+              required
               className="w-full p-3 pl-10 border border-gray-600 rounded-md shadow-sm bg-gray-700 text-white focus:ring-primary focus:border-primary"
             >
               <option value="">-- Selecione uma forma de pagamento --</option>
-              {uniquePaymentMethods.map(pm => (<option key={pm.name} value={pm.name}>{pm.name}</option>))}
-              <option value={ADD_NEW_SENTINEL}>Cadastrar Nova...</option>
+              {paymentMethods.map(pm => (<option key={pm} value={pm}>{pm}</option>))}
             </select>
           </div>
-          {showNewPaymentMethodInput && (
-            <InputField label="" id="newPaymentMethodName" name="newPaymentMethodName" value={newPaymentMethodName} onChange={handleNewPaymentMethodNameChange} placeholder="Digite a nova forma de pagamento" required Icon={CreditCardIcon} className="mt-3" />
-          )}
         </div>
 
         <h4 className="text-lg font-medium text-gray-200 pt-4">Produtos</h4>
@@ -368,7 +366,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
                             className="w-full p-3 pl-10 border border-gray-600 rounded-md shadow-sm bg-gray-700 text-white focus:ring-primary focus:border-primary"
                         >
                             <option value="">-- Selecione um produto --</option>
-                            {PRODUTOS_TAIMIN.map(prod => (
+                            {availableProducts.map(prod => (
                                 <option key={prod.name} value={prod.name}>{prod.name}</option>
                             ))}
                         </select>
@@ -406,16 +404,27 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
             {selectedProducts.length > 0 && (
                 <div className="mt-4 space-y-2">
                     <h4 className="text-sm font-medium text-gray-300">Produtos adicionados:</h4>
-                    <ul className="list-disc list-inside pl-1 text-sm text-gray-200 max-h-32 overflow-y-auto bg-slate-600/50 p-3 rounded-md">
-                        {selectedProducts.map(p => (
-                            <li key={p.nomeProduto} className="flex justify-between items-center py-1">
-                                <span>{p.nomeProduto} ({p.unidades} unid.)</span>
-                                <button type="button" onClick={() => handleRemoveProduct(p.nomeProduto)} className="text-red-400 hover:text-red-300" title="Remover Produto">
-                                    <TrashIcon className="h-4 w-4" />
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
+                    <div className="max-h-32 overflow-y-auto bg-slate-600/50 p-3 rounded-md">
+                        <table className="w-full text-sm text-left">
+                            <tbody>
+                            {selectedProducts.map(p => (
+                                <tr key={p.nomeProduto} className="border-b border-slate-500/50 last:border-b-0">
+                                    <td className="py-1 text-gray-200">{p.nomeProduto}</td>
+                                    <td className="py-1 text-center text-gray-300">x {p.unidades}</td>
+                                    <td className="py-1 text-right text-gray-200">{(p.preco_unitario * p.unidades).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                    <td className="py-1 text-right">
+                                        <button type="button" onClick={() => handleRemoveProduct(p.nomeProduto)} className="text-red-400 hover:text-red-300" title="Remover Produto">
+                                            <TrashIcon className="h-4 w-4" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
+                    </div>
+                     <div className="text-right text-xl font-bold text-white mt-4 pr-2">
+                        Total: {totalVenda.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </div>
                 </div>
             )}
         </div>

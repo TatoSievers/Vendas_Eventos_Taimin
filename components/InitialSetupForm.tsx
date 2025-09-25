@@ -1,14 +1,12 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { InitialSetupFormProps as InitialSetupFormPropsType } from '../types';
 import InputField from './InputField';
-import { UserIcon, CalendarDaysIcon, TagIcon } from './icons';
+import { UserIcon, CalendarDaysIcon, TagIcon, CubeIcon } from './icons';
 
 const ADD_NEW_SENTINEL = "ADD_NEW_SENTINEL_VALUE"; // Generic sentinel for both user and event
 
 
-const InitialSetupForm: React.FC<InitialSetupFormPropsType> = ({ onSetupComplete, uniqueEvents, uniqueUsers, onCreateUser, onCreateEvent }) => {
+const InitialSetupForm: React.FC<InitialSetupFormPropsType> = ({ onSetupComplete, uniqueEvents, uniqueUsers, onCreateUser, onCreateEvent, onOpenProductManager }) => {
   const [selectedUserName, setSelectedUserName] = useState<string>('');
   const [newUserName, setNewUserName] = useState<string>('');
   const [showNewUserInput, setShowNewUserInput] = useState<boolean>(false);
@@ -218,6 +216,17 @@ const InitialSetupForm: React.FC<InitialSetupFormPropsType> = ({ onSetupComplete
           {isSubmitting ? 'Salvando...' : 'Iniciar Registros'}
         </button>
       </form>
+       <div className="mt-6 text-center border-t border-slate-700 pt-4">
+            <button
+                type="button"
+                onClick={onOpenProductManager}
+                className="w-full text-primary-light hover:text-white py-2 rounded-md transition duration-150 ease-in-out flex items-center justify-center gap-2"
+                title="Gerenciar a lista de produtos disponíveis para venda"
+            >
+                <CubeIcon className="h-5 w-5" />
+                Gerenciar Produtos
+            </button>
+        </div>
     </div>
   );
 };

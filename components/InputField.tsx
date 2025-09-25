@@ -16,7 +16,8 @@ const InputField: React.FC<InputFieldProps> = ({
   className = '',
   maxLength,
   pattern,
-  min
+  min,
+  step
 }) => {
   return (
     <div className="mb-6">
@@ -43,6 +44,7 @@ const InputField: React.FC<InputFieldProps> = ({
           maxLength={maxLength}
           pattern={pattern}
           min={min}
+          step={step}
           className={`w-full p-3 ${Icon ? 'pl-10' : ''} border border-gray-600 rounded-md shadow-sm bg-gray-700 text-white placeholder-gray-400 focus:ring-primary focus:border-primary transition duration-150 ease-in-out ${readOnly ? 'bg-gray-600 cursor-not-allowed' : ''} ${className}`}
         />
       </div>

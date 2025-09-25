@@ -1,5 +1,3 @@
-
-
 import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { SalesData, EventDetail, UserDetail } from '../types';
 import { ArrowUturnLeftIcon, DownloadIcon, ChevronDownIcon, UserIcon, CubeIcon, CreditCardIcon } from './icons';
@@ -19,8 +17,8 @@ interface ManagerialDashboardProps {
 }
 
 interface ProductSummary { [productName: string]: number; }
-interface EventSummary { [eventName: string]: { salesCount: number; unitsSold: number }; }
-interface UserSalesSummary { [userName: string]: { totalUnitsSold: number; salesCount: number }; }
+interface EventSummary { [eventName: string]: { salesCount: number; unitsSold: number; totalValue: number; }; }
+interface UserSalesSummary { [userName: string]: { totalUnitsSold: number; salesCount: number; totalValue: number; }; }
 
 
 const getChartOptions = (titleText: string, isPieChart: boolean = false) => ({
@@ -38,6 +36,7 @@ const getChartOptions = (titleText: string, isPieChart: boolean = false) => ({
 });
 
 const chartColors = ['#34d399', '#fbbf24', '#60a5fa', '#f87171', '#a78bfa', '#22d3ee', '#f472b6', '#84cc16'];
+const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const StatCard: React.FC<{title: string; value: string | number;}> = ({ title, value }) => (
     <div className="bg-slate-700 p-6 rounded-lg shadow text-center">
@@ -61,6 +60,7 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
 
   const totalSalesCount = filteredSales.length;
   const totalUnitsSold = useMemo(() => filteredSales.reduce((sum, sale) => sum + sale.produtos.reduce((pSum, p) => pSum + p.unidades, 0), 0), [filteredSales]);
+  const totalRevenue = useMemo(() => filteredSales.reduce((sum, sale) => sum + sale.valorTotal, 0), [filteredSales]);
 
   const salesPerProduct = useMemo<ProductSummary>(() => {
     const summary: ProductSummary = {};
@@ -75,9 +75,10 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
   const salesPerEvent = useMemo<EventSummary>(() => {
     const summary: EventSummary = {};
     filteredSales.forEach(sale => {
-      if (!summary[sale.nomeEvento]) summary[sale.nomeEvento] = { salesCount: 0, unitsSold: 0 };
+      if (!summary[sale.nomeEvento]) summary[sale.nomeEvento] = { salesCount: 0, unitsSold: 0, totalValue: 0 };
       summary[sale.nomeEvento].salesCount += 1;
       summary[sale.nomeEvento].unitsSold += sale.produtos.reduce((sum, p) => sum + p.unidades, 0);
+      summary[sale.nomeEvento].totalValue += sale.valorTotal;
     });
     return Object.fromEntries(Object.entries(summary).sort(([, a], [, b]) => (b as EventSummary[string]).salesCount - (a as EventSummary[string]).salesCount));
   }, [filteredSales]);
@@ -85,11 +86,12 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
   const userSalesData = useMemo<UserSalesSummary>(() => {
     const summary: UserSalesSummary = {};
     filteredSales.forEach(sale => {
-      if (!summary[sale.nomeUsuario]) summary[sale.nomeUsuario] = { totalUnitsSold: 0, salesCount: 0 };
+      if (!summary[sale.nomeUsuario]) summary[sale.nomeUsuario] = { totalUnitsSold: 0, salesCount: 0, totalValue: 0 };
       summary[sale.nomeUsuario].salesCount += 1;
       summary[sale.nomeUsuario].totalUnitsSold += sale.produtos.reduce((sum, p) => sum + p.unidades, 0);
+      summary[sale.nomeUsuario].totalValue += sale.valorTotal;
     });
-    return Object.fromEntries(Object.entries(summary).sort(([, a], [, b]) => (b as UserSalesSummary[string]).totalUnitsSold - (a as UserSalesSummary[string]).totalUnitsSold));
+    return Object.fromEntries(Object.entries(summary).sort(([, a], [, b]) => (b as UserSalesSummary[string]).totalValue - (a as UserSalesSummary[string]).totalValue));
   }, [filteredSales]);
 
   const productChartRef = useRef<HTMLCanvasElement>(null);
@@ -171,9 +173,10 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
         startY: yPos,
         head: [['Indicador', 'Valor']],
         body: [
+            ['Faturamento Total', formatCurrency(totalRevenue)],
             ['Total de Vendas Registradas', totalSalesCount.toString()],
             ['Total de Unidades Vendidas', totalUnitsSold.toString()],
-            ['Média de Unidades por Venda', (totalUnitsSold / totalSalesCount || 0).toFixed(2)],
+            ['Ticket Médio por Venda', formatCurrency(totalRevenue / totalSalesCount || 0)],
             ['Produto Mais Vendido', topProduct],
         ],
         theme: 'grid',
@@ -239,7 +242,7 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
                     startY: yPos,
                     theme: 'plain',
                     body: [
-                        [{ content: `Cliente: ${sale.primeiroNome} ${sale.sobrenome} (CPF: ${sale.cpf})`, styles: { fontStyle: 'bold', textColor: 40 } }],
+                        [{ content: `Cliente: ${sale.primeiroNome} ${sale.sobrenome} | Total: ${formatCurrency(sale.valorTotal)}`, styles: { fontStyle: 'bold', textColor: 40 } }],
                         [{ content: `Data da Venda: ${formatDate(sale.created_at)}` }],
                         [{ content: `Contato: ${sale.email} | (${sale.ddd}) ${sale.telefoneNumero}` }],
                         [{ content: `Endereço: ${formatAddress(sale)}` }],
@@ -292,7 +295,8 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
       </div>
 
       {/* KPI Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <StatCard title="Faturamento Total" value={formatCurrency(totalRevenue)} />
         <StatCard title="Total de Vendas" value={totalSalesCount} />
         <StatCard title="Unidades Vendidas" value={totalUnitsSold} />
         <StatCard title="Produto Mais Vendido" value={topProduct} />
@@ -324,7 +328,7 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
                       <li key={name} className="flex justify-between items-center p-2 rounded bg-slate-600/50">
                            <span>{name}</span>
                           <span className="text-right">
-                              {(data as UserSalesSummary[string]).totalUnitsSold} unid. / {(data as UserSalesSummary[string]).salesCount} vendas
+                              {formatCurrency((data as UserSalesSummary[string]).totalValue)} / {(data as UserSalesSummary[string]).salesCount} vendas
                           </span>
                       </li>
                   ))}
@@ -339,13 +343,16 @@ const ManagerialDashboard: React.FC<ManagerialDashboardProps> = ({ allSales, ini
                 {eventNames.length > 0 ? eventNames.map(eventName => (
                     <details key={eventName} className="group bg-slate-600/50 rounded-lg">
                         <summary className="p-3 cursor-pointer text-cyan-300 hover:bg-slate-600 flex justify-between items-center rounded-lg transition-colors">
-                            <span className="font-semibold">{eventName} ({salesPerEvent[eventName].salesCount} vendas)</span>
+                            <span className="font-semibold">{eventName} ({salesPerEvent[eventName].salesCount} vendas | {formatCurrency(salesPerEvent[eventName].totalValue)})</span>
                             <ChevronDownIcon className="h-5 w-5 transition-transform duration-300 group-open:rotate-180"/>
                         </summary>
                         <div className="border-t border-slate-500 p-4 space-y-4">
                             {filteredSales.filter(s => s.nomeEvento === eventName).map(sale => (
                                 <div key={sale.id} className="bg-slate-700/80 p-3 rounded-md text-sm">
-                                    <p className="font-bold text-white">{sale.primeiroNome} {sale.sobrenome}</p>
+                                    <p className="font-bold text-white flex justify-between">
+                                        <span>{sale.primeiroNome} {sale.sobrenome}</span>
+                                        <span>{formatCurrency(sale.valorTotal)}</span>
+                                    </p>
                                     <div className="text-gray-300 mt-2 space-y-1">
                                       <p className="flex items-center"><CubeIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.produtos.map(p => `${p.nomeProduto} (${p.unidades})`).join(', ')}</p>
                                       <p className="flex items-center"><CreditCardIcon className="h-4 w-4 mr-2 text-cyan-400"/> {sale.formaPagamento}</p>
