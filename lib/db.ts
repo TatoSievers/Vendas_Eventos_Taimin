@@ -1,4 +1,4 @@
-import { Pool, neon, neonConfig } from '@neondatabase/serverless';
+import { neon, neonConfig } from '@neondatabase/serverless';
 import { VercelRequest } from '@vercel/node';
 
 // Required for Vercel/Neon connection

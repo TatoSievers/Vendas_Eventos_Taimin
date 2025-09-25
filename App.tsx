@@ -1,4 +1,4 @@
-// Fix: Add triple-slash directive to include Vite client types and resolve TypeScript error for import.meta.env.
+// Fix: Add triple-slash directive for Vite client types to resolve errors with `import.meta.env`.
 /// <reference types="vite/client" />
 
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
