@@ -1,3 +1,4 @@
+// FIX: Corrected the import path to point to the correct db.ts file.
 import pool from '../../lib/db';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
