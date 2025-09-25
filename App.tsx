@@ -1,5 +1,6 @@
-// Fix: Removed the 'vite/client' triple-slash directive that was causing a type resolution error.
-// The necessary types for 'import.meta.env' are now defined in 'types.ts' to resolve the issue.
+// Fix: Add triple-slash directive to include Vite client types and resolve error on import.meta.env
+/// <reference types="vite/client" />
+
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import SalesForm from './components/SalesForm';
 import InitialSetupForm from './components/InitialSetupForm';
