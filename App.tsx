@@ -1,92 +1,39 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import SalesForm from './components/SalesForm';
-import SalesList from './components/SalesList';
 import InitialSetupForm from './components/InitialSetupForm';
-import ManagerialDashboard from './components/ManagerialDashboard';
 import Lightbox from './components/Lightbox';
 import Header from './components/Header';
 import { SalesData, EventDetail, UserDetail, InitialSetupData, PaymentMethodDetail, LightboxMessage } from './types';
 import PasswordScreen from './components/PasswordScreen';
-import DatabaseErrorScreen from './components/DatabaseErrorScreen';
 
-// --- Funções Auxiliares para Mapeamento de Dados ---
-const fromDatabaseRecord = (dbRecord: { [key: string]: any }): any => {
-    const keyMap: { [key: string]: string } = {
-        'id': 'id',
-        'created_at': 'created_at',
-        'nomeusuario': 'nomeUsuario',
-        'nomeevento': 'nomeEvento',
-        'dataevento': 'dataEvento',
-        'primeironome': 'primeiroNome',
-        'sobrenome': 'sobrenome',
-        'cpf': 'cpf',
-        'email': 'email',
-        'ddd': 'ddd',
-        'telefonenumero': 'telefoneNumero',
-        'logradourorua': 'logradouroRua',
-        'numeroendereco': 'numeroEndereco',
-        'complemento': 'complemento',
-        'bairro': 'bairro',
-        'cidade': 'cidade',
-        'estado': 'estado',
-        'cep': 'cep',
-        'formapagamento': 'formaPagamento',
-        'observacao': 'observacao'
-    };
-    const appRecord: { [key: string]: any } = {};
-    for (const dbKey in dbRecord) {
-        const appKey = keyMap[dbKey] || dbKey;
-        appRecord[appKey] = dbRecord[dbKey];
-    }
-    return appRecord;
-};
+const ManagerialDashboard = lazy(() => import('./components/ManagerialDashboard'));
+const SalesList = lazy(() => import('./components/SalesList'));
 
-const toDatabaseRecord = (appRecord: { [key: string]: any }): any => {
-    const keyMap: { [key: string]: string } = {
-        'nomeUsuario': 'nomeusuario',
-        'nomeEvento': 'nomeevento',
-        'dataEvento': 'dataevento',
-        'primeiroNome': 'primeironome',
-        'sobrenome': 'sobrenome',
-        'cpf': 'cpf',
-        'email': 'email',
-        'ddd': 'ddd',
-        'telefoneNumero': 'telefonenumero',
-        'logradouroRua': 'logradourorua',
-        'numeroEndereco': 'numeroendereco',
-        'complemento': 'complemento',
-        'bairro': 'bairro',
-        'cidade': 'cidade',
-        'estado': 'estado',
-        'cep': 'cep',
-        'formaPagamento': 'formapagamento',
-        'observacao': 'observacao'
-    };
-    const dbRecord: { [key: string]: any } = {};
-    for (const appKey in appRecord) {
-        const dbKey = keyMap[appKey];
-        if (dbKey) {
-            dbRecord[dbKey] = appRecord[appKey];
+
+// --- Funções Auxiliares para Armazenamento Local ---
+const loadFromLocalStorage = <T,>(key: string, defaultValue: T): T => {
+    const saved = localStorage.getItem(key);
+    if (saved) {
+        try {
+            return JSON.parse(saved);
+        } catch (e) {
+            console.error(`Error parsing localStorage key "${key}":`, e);
+            return defaultValue;
         }
     }
-    return dbRecord;
+    return defaultValue;
 };
-
 
 type AppView = 'setup' | 'salesFormAndList' | 'dashboard';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
-  const [isDbError, setIsDbError] = useState<boolean>(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [allSales, setAllSales] = useState<SalesData[]>([]);
-  const [currentView, setCurrentView] = useState<AppView>('setup');
-  
-  const [appUsers, setAppUsers] = useState<UserDetail[]>([]);
-  const [appEvents, setAppEvents] = useState<EventDetail[]>([]);
-  const [appPaymentMethods, setAppPaymentMethods] = useState<PaymentMethodDetail[]>([]);
+  const [allSales, setAllSales] = useState<SalesData[]>(() => loadFromLocalStorage('salesData', []));
+  const [appUsers, setAppUsers] = useState<UserDetail[]>(() => loadFromLocalStorage('appUsers', []));
+  const [appEvents, setAppEvents] = useState<EventDetail[]>(() => loadFromLocalStorage('appEvents', []));
+  const [appPaymentMethods, setAppPaymentMethods] = useState<PaymentMethodDetail[]>(() => loadFromLocalStorage('appPaymentMethods', []));
 
+  const [currentView, setCurrentView] = useState<AppView>('setup');
   const [currentUser, setCurrentUser] = useState<string>('');
   const [currentEventName, setCurrentEventName] = useState<string>('');
   const [currentEventDate, setCurrentEventDate] = useState<string>('');
@@ -98,72 +45,15 @@ const App: React.FC = () => {
 
   const [lightboxMessage, setLightboxMessage] = useState<LightboxMessage | null>(null);
   
-  const appPassword = (import.meta as any).env.VITE_APP_PASSWORD;
+  // Hardcoded password to ensure the app runs in any environment without a build step.
+  const appPassword = '12';
 
-  const handleApiError = async (response: Response, action: string): Promise<string> => {
-      let errorMessage = `Erro ${response.status} ao ${action}.`;
-      try {
-          const contentType = response.headers.get("content-type");
-          if (contentType && contentType.includes("application/json")) {
-              const errorData = await response.json();
-              errorMessage = errorData.details || errorData.error || errorMessage;
-          } else {
-              const errorText = await response.text();
-              if (errorText) {
-                errorMessage = errorText;
-              }
-          }
-      } catch (e) {
-          errorMessage = `Erro de comunicação com o servidor ao ${action}.`;
-      }
-      console.error(errorMessage);
-      return errorMessage;
-  };
+  // Persist state to localStorage on change
+  useEffect(() => { localStorage.setItem('salesData', JSON.stringify(allSales)); }, [allSales]);
+  useEffect(() => { localStorage.setItem('appUsers', JSON.stringify(appUsers)); }, [appUsers]);
+  useEffect(() => { localStorage.setItem('appEvents', JSON.stringify(appEvents)); }, [appEvents]);
+  useEffect(() => { localStorage.setItem('appPaymentMethods', JSON.stringify(appPaymentMethods)); }, [appPaymentMethods]);
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const fetchInitialData = async () => {
-      setIsDataLoaded(false);
-      setIsDbError(false);
-      try {
-        const response = await fetch('/api/data');
-        if (!response.ok) {
-            const errorText = await handleApiError(response, 'carregar dados');
-            const lowerErrorText = errorText.toLowerCase();
-            if (
-              lowerErrorText.includes('does not exist') ||
-              lowerErrorText.includes('could not find table') ||
-              lowerErrorText.includes('schema cache')
-            ) {
-                setIsDbError(true);
-            } else {
-                throw new Error(errorText);
-            }
-        } else {
-            const { sales, users, events, paymentMethods } = await response.json();
-            
-            const formattedSales = sales.map((dbSale: any) => fromDatabaseRecord(dbSale)) as SalesData[];
-            setAllSales(formattedSales);
-            setAppUsers(users || []);
-            setAppEvents(events || []);
-            setAppPaymentMethods(paymentMethods || []);
-        }
-
-      } catch (error: any) {
-        setLightboxMessage({ type: 'error', text: error.message || "Ocorreu um erro inesperado ao carregar os dados." });
-        setAllSales([]);
-      } finally {
-        setIsDataLoaded(true);
-      }
-    };
-
-    fetchInitialData();
-  }, [isAuthenticated, retryCount]);
-
-  const handleRetryDbConnection = () => {
-    setRetryCount(c => c + 1);
-  };
 
   const handleInitialSetupComplete = (setupData: InitialSetupData) => {
     setCurrentUser(setupData.userName);
@@ -173,83 +63,43 @@ const App: React.FC = () => {
     setCurrentView('salesFormAndList');
   };
 
-  const createSetupItem = async (type: 'user' | 'event' | 'paymentMethod', payload: any) => {
-      try {
-          const response = await fetch('/api/setup', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type, payload }),
-          });
-          if (!response.ok) {
-              const errorText = await handleApiError(response, `criar ${type}`);
-              // Ignore duplicate errors silently
-              if (!errorText.toLowerCase().includes('duplicate')) {
-                 throw new Error(errorText);
-              }
-              return null; // Return null on handled duplicate
-          }
-          return await response.json();
-      } catch (error: any) {
-          // Rethrow to be caught by the calling function
-          throw error;
-      }
-  };
-  
   const handleCreateUser = async (name: string) => {
-      const data = await createSetupItem('user', { name });
-      if (data) setAppUsers(prev => [...prev, data]);
+      if (appUsers.some(u => u.name.trim().toLowerCase() === name.trim().toLowerCase())) return; // Ignore duplicates
+      setAppUsers(prev => [...prev, { name }]);
   };
 
   const handleCreateEvent = async (name: string, date: string) => {
-      const data = await createSetupItem('event', { name, date });
-      if (data) setAppEvents(prev => [...prev, data]);
+      if (appEvents.some(e => e.name.trim().toLowerCase() === name.trim().toLowerCase())) return; // Ignore duplicates
+      setAppEvents(prev => [...prev, { name, date }]);
   };
 
   const handleCreatePaymentMethod = async (name: string) => {
-      const data = await createSetupItem('paymentMethod', { name });
-      if (data) setAppPaymentMethods(prev => [...prev, data]);
+      if (appPaymentMethods.some(pm => pm.name.trim().toLowerCase() === name.trim().toLowerCase())) return; // Ignore duplicates
+      setAppPaymentMethods(prev => [...prev, { name }]);
   };
 
   const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
-      const { id, created_at, produtos, ...salePayload } = saleData;
-      const recordToSubmit = toDatabaseRecord(salePayload);
-
-      const body = {
-          saleData: recordToSubmit,
-          products: produtos.map(p => ({ nome_produto: p.nomeProduto, quantidade: p.unidades, preco_unitario: 0 }))
-      };
-
       try {
-          let response;
           if (isEditing && editingSaleId) {
-              response = await fetch(`/api/sales/${editingSaleId}`, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(body),
-              });
-          } else {
-              response = await fetch('/api/sales', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(body),
-              });
-          }
-
-          if (!response.ok) throw new Error(await handleApiError(response, isEditing ? 'atualizar venda' : 'registrar venda'));
-          
-          const savedSaleData = await response.json();
-          const savedSaleAppFormat = fromDatabaseRecord(savedSaleData);
-          const completeSale: SalesData = { ...savedSaleAppFormat, produtos: saleData.produtos };
-          
-          if (isEditing) {
-              setAllSales(prev => prev.map(s => s.id === editingSaleId ? completeSale : s));
+              const originalSale = allSales.find(s => s.id === editingSaleId);
+              const updatedSale: SalesData = {
+                  ...saleData,
+                  id: editingSaleId,
+                  created_at: originalSale?.created_at || new Date().toISOString(), // Preserve original creation date
+              };
+              setAllSales(prev => prev.map(s => s.id === editingSaleId ? updatedSale : s));
               setLightboxMessage({ type: 'success', text: 'Venda atualizada com sucesso!' });
           } else {
-              setAllSales(prev => [completeSale, ...prev]);
+              const newSale: SalesData = {
+                  ...saleData,
+                  id: crypto.randomUUID(),
+                  created_at: new Date().toISOString(),
+              };
+              setAllSales(prev => [newSale, ...prev]);
               setLightboxMessage({ type: 'success', text: 'Venda registrada com sucesso!' });
           }
       } catch (error: any) {
-          setLightboxMessage({ type: 'error', text: error.message });
+          setLightboxMessage({ type: 'error', text: 'Ocorreu um erro ao salvar a venda.' });
       }
       setEditingSaleId(null);
   };
@@ -257,13 +107,10 @@ const App: React.FC = () => {
   const handleDeleteSale = async (saleId: string) => {
     if (!window.confirm("Tem certeza que deseja excluir esta venda?")) return;
     try {
-        const response = await fetch(`/api/sales/${saleId}`, { method: 'DELETE' });
-        if (!response.ok) throw new Error(await handleApiError(response, 'excluir venda'));
-        
         setAllSales(prev => prev.filter(s => s.id !== saleId));
         setLightboxMessage({ type: 'success', text: 'Venda excluída com sucesso.' });
     } catch (error: any) {
-        setLightboxMessage({ type: 'error', text: error.message });
+        setLightboxMessage({ type: 'error', text: 'Ocorreu um erro ao excluir a venda.' });
     }
   };
 
@@ -271,15 +118,12 @@ const App: React.FC = () => {
     const salesCount = allSales.filter(s => s.nomeEvento === eventName).length;
     if (!window.confirm(`Tem certeza que deseja apagar o evento "${eventName}" e todas as suas ${salesCount} vendas associadas? Esta ação é irreversível.`)) return;
     try {
-        const response = await fetch(`/api/events/${encodeURIComponent(eventName)}`, { method: 'DELETE' });
-        if (!response.ok) throw new Error(await handleApiError(response, 'excluir evento'));
-      
         setAppEvents(prev => prev.filter(e => e.name !== eventName));
         setAllSales(prev => prev.filter(s => s.nomeEvento !== eventName));
         setFilterEvent('');
         setLightboxMessage({ type: 'success', text: `Evento "${eventName}" e todas as suas vendas foram excluídos.` });
     } catch (error: any) {
-        setLightboxMessage({ type: 'error', text: error.message });
+        setLightboxMessage({ type: 'error', text: 'Ocorreu um erro ao excluir o evento.' });
     }
   };
   
@@ -301,9 +145,7 @@ const App: React.FC = () => {
   const handleCancelEdit = () => setEditingSaleId(null);
 
   const uniqueEvents = useMemo<EventDetail[]>(() => {
-    const eventMap = new Map<string, string>();
-    appEvents.forEach(e => { if (e.name && e.date) eventMap.set(e.name, e.date) });
-    return Array.from(eventMap, ([name, date]) => ({ name, date })).sort((a,b) => a.name.localeCompare(b.name));
+    return [...appEvents].sort((a,b) => a.name.localeCompare(b.name));
   }, [appEvents]);
 
   const uniqueUsers = useMemo<UserDetail[]>(() => {
@@ -326,7 +168,7 @@ const App: React.FC = () => {
       const matchesEvent = filterEvent ? sale.nomeEvento === filterEvent : true;
       const matchesUser = filterUser ? sale.nomeUsuario === filterUser : true;
       return matchesSearch && matchesEvent && matchesUser;
-    });
+    }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [allSales, searchTerm, filterEvent, filterUser]);
 
   const navigateToDashboard = () => setCurrentView('dashboard');
@@ -347,8 +189,6 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setIsAuthenticated(false);
     setCurrentView('setup');
-    setAllSales([]);
-    setIsDataLoaded(false);
   };
 
   const saleBeingEdited = editingSaleId ? allSales.find(s => s.id === editingSaleId) || null : null;
@@ -367,25 +207,6 @@ const App: React.FC = () => {
 
   if (!isAuthenticated) {
     return <PasswordScreen onCorrectPassword={() => setIsAuthenticated(true)} appPassword={appPassword} />;
-  }
-  
-  if (isDbError) {
-    return <DatabaseErrorScreen onRetry={handleRetryDbConnection} />;
-  }
-
-  if (!isDataLoaded) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 text-white text-center">
-        <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-24 w-auto mb-8" />
-        <div>
-            <svg className="animate-spin h-10 w-10 text-primary mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p className="text-lg text-gray-300 mt-4">Carregando dados...</p>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -427,32 +248,44 @@ const App: React.FC = () => {
                   onNotify={setLightboxMessage} 
                   onCreatePaymentMethod={handleCreatePaymentMethod}
                 />
-                <SalesList 
-                  sales={filteredSales}
-                  allSalesForFilters={allSales}
-                  onNavigateToDashboard={navigateToDashboard} 
-                  onEditSale={handleSetEditingSale} 
-                  onDeleteSale={handleDeleteSale}
-                  onNotify={setLightboxMessage}
-                  searchTerm={searchTerm}
-                  setSearchTerm={setSearchTerm}
-                  filterEvent={filterEvent}
-                  setFilterEvent={setFilterEvent}
-                  filterUser={filterUser}
-                  setFilterUser={setFilterUser}
-                  onDeleteEvent={handleDeleteEvent}
-                />
+                <Suspense fallback={
+                  <div className="w-full max-w-4xl bg-slate-800 p-8 rounded-xl shadow-2xl text-center">
+                    <h2 className="text-2xl font-semibold text-white">Carregando Vendas...</h2>
+                  </div>
+                }>
+                  <SalesList 
+                    sales={filteredSales}
+                    allSalesForFilters={allSales}
+                    onNavigateToDashboard={navigateToDashboard} 
+                    onEditSale={handleSetEditingSale} 
+                    onDeleteSale={handleDeleteSale}
+                    onNotify={setLightboxMessage}
+                    searchTerm={searchTerm}
+                    setSearchTerm={setSearchTerm}
+                    filterEvent={filterEvent}
+                    setFilterEvent={setFilterEvent}
+                    filterUser={filterUser}
+                    setFilterUser={setFilterUser}
+                    onDeleteEvent={handleDeleteEvent}
+                  />
+                </Suspense>
               </>
             )}
             {currentView === 'dashboard' && (
-              <ManagerialDashboard 
-                allSales={allSales} 
-                initialFilterEvent={filterEvent} 
-                initialFilterUser={filterUser}
-                uniqueEvents={uniqueEvents}
-                uniqueUsers={uniqueUsers}
-                onGoBack={navigateToSalesForm} 
-              />
+              <Suspense fallback={
+                <div className="w-full text-center p-10">
+                  <h2 className="text-2xl font-semibold text-white">Carregando Relatório...</h2>
+                </div>
+              }>
+                <ManagerialDashboard 
+                  allSales={allSales} 
+                  initialFilterEvent={filterEvent} 
+                  initialFilterUser={filterUser}
+                  uniqueEvents={uniqueEvents}
+                  uniqueUsers={uniqueUsers}
+                  onGoBack={navigateToSalesForm} 
+                />
+              </Suspense>
             )}
           </main>
         </>

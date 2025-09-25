@@ -1,6 +1,3 @@
-
-
-// FIX: Import React to make its types available in this file.
 import React from 'react';
 
 // Este arquivo define os "formatos" ou "modelos" de dados para toda a aplicação.
@@ -91,7 +88,6 @@ export interface LightboxMessage {
   text: string;
 }
 
-// FIX: Added missing interface for InputField component props.
 export interface InputFieldProps {
   label: string;
   id: string;
@@ -110,7 +106,6 @@ export interface InputFieldProps {
   min?: number;
 }
 
-// FIX: Added missing interface for TextAreaField component props.
 export interface TextAreaFieldProps {
   label: string;
   id: string;
@@ -123,7 +118,6 @@ export interface TextAreaFieldProps {
   Icon?: React.FC<React.SVGProps<SVGSVGElement>>;
 }
 
-// FIX: Added missing interface for SalesForm component props.
 export interface SalesFormProps {
     onSaveSale: (saleData: SalesData, isEditing: boolean) => Promise<void>;
     editingSale: SalesData | null;
@@ -147,7 +141,6 @@ export interface InitialSetupFormProps {
 }
 
 
-// FIX: Added missing interface for product information used in constants.
 export interface ProdutoInfo {
   name: string;
 }

@@ -4,21 +4,39 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vendas Taimin</title>
-  <link rel="stylesheet" href="/index.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              light: '#67e8f9',
+              DEFAULT: '#0891b2',
+              dark: '#0e7490',
+            },
+            secondary: {
+              light: '#f3f4f6',
+              DEFAULT: '#e5e7eb',
+              dark: '#d1d5db',
+            }
+          }
+        }
+      }
+    }
+  </script>
 <script type="importmap">
 {
   "imports": {
     "vite": "https://aistudiocdn.com/vite@^7.1.7",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^18.3.1/",
     "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.3",
-    "react/": "https://aistudiocdn.com/react@^19.1.1/",
-    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react/": "https://aistudiocdn.com/react@^18.3.1/",
+    "react": "https://aistudiocdn.com/react@^18.3.1",
     "chart.js/": "https://aistudiocdn.com/chart.js@^4.5.0/",
     "xlsx": "https://aistudiocdn.com/xlsx@^0.18.5",
     "jspdf": "https://aistudiocdn.com/jspdf@^3.0.3",
-    "jspdf-autotable": "https://aistudiocdn.com/jspdf-autotable@^5.0.2",
-    "pg": "https://aistudiocdn.com/pg@^8.16.3",
-    "@vercel/node": "https://aistudiocdn.com/@vercel/node@^5.3.24"
+    "jspdf-autotable": "https://aistudiocdn.com/jspdf-autotable@^5.0.2"
   }
 }
 </script>
