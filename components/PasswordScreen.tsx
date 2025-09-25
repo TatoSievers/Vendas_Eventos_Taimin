@@ -1,10 +1,8 @@
-
-
 import React, { useState } from 'react';
 
 interface PasswordScreenProps {
   onCorrectPassword: () => void;
-  appPassword: string;
+  appPassword?: string;
 }
 
 const PasswordScreen: React.FC<PasswordScreenProps> = ({ onCorrectPassword, appPassword }) => {

@@ -125,7 +125,6 @@ export interface SalesFormProps {
     editingSale: SalesData | null;
     onCancelEdit: () => void;
     paymentMethods: readonly string[];
-    allSales: SalesData[];
     appProducts: ProdutoInfo[];
     currentUser: string;
     currentEventName: string;

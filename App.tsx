@@ -1,3 +1,6 @@
+// Fix: Add triple-slash directive to include Vite client types and resolve TypeScript error for import.meta.env.
+/// <reference types="vite/client" />
+
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import SalesForm from './components/SalesForm';
 import InitialSetupForm from './components/InitialSetupForm';
@@ -5,36 +8,25 @@ import Lightbox from './components/Lightbox';
 import Header from './components/Header';
 import { SalesData, EventDetail, UserDetail, InitialSetupData, LightboxMessage, ProdutoInfo } from './types';
 import PasswordScreen from './components/PasswordScreen';
-import { PRODUTOS_TAIMIN, PAYMENT_METHODS } from './constants';
+import { PAYMENT_METHODS } from './constants';
 import PasswordPrompt from './components/PasswordPrompt';
+import DatabaseErrorScreen from './components/DatabaseErrorScreen';
 
 const ManagerialDashboard = lazy(() => import('./components/ManagerialDashboard'));
 const SalesList = lazy(() => import('./components/SalesList'));
 const ProductManager = lazy(() => import('./components/ProductManager'));
 
-
-// --- Funções Auxiliares para Armazenamento Local ---
-const loadFromLocalStorage = <T,>(key: string, defaultValue: T): T => {
-    const saved = localStorage.getItem(key);
-    if (saved) {
-        try {
-            return JSON.parse(saved);
-        } catch (e) {
-            console.error(`Error parsing localStorage key "${key}":`, e);
-            return defaultValue;
-        }
-    }
-    return defaultValue;
-};
-
 type AppView = 'setup' | 'salesFormAndList' | 'dashboard';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [allSales, setAllSales] = useState<SalesData[]>(() => loadFromLocalStorage('salesData', []));
-  const [appUsers, setAppUsers] = useState<UserDetail[]>(() => loadFromLocalStorage('appUsers', []));
-  const [appEvents, setAppEvents] = useState<EventDetail[]>(() => loadFromLocalStorage('appEvents', []));
-  const [appProducts, setAppProducts] = useState<ProdutoInfo[]>(() => loadFromLocalStorage('appProducts', PRODUTOS_TAIMIN));
+  const [allSales, setAllSales] = useState<SalesData[]>([]);
+  const [appUsers, setAppUsers] = useState<UserDetail[]>([]);
+  const [appEvents, setAppEvents] = useState<EventDetail[]>([]);
+  const [appProducts, setAppProducts] = useState<ProdutoInfo[]>([]);
+
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   const [currentView, setCurrentView] = useState<AppView>('setup');
   const [currentUser, setCurrentUser] = useState<string>('');
@@ -50,14 +42,33 @@ const App: React.FC = () => {
   const [isProductManagerOpen, setIsProductManagerOpen] = useState<boolean>(false);
   const [isProductManagerPasswordPromptOpen, setIsProductManagerPasswordPromptOpen] = useState<boolean>(false);
   
-  // Hardcoded password to ensure the app runs in any environment without a build step.
-  const appPassword = '12';
+  // Use VITE_APP_PASSWORD from .env file for security, with a fallback for convenience.
+  // In Vercel, this should be set as an environment variable.
+  const appPassword = import.meta.env.VITE_APP_PASSWORD || '12';
 
-  // Persist state to localStorage on change
-  useEffect(() => { localStorage.setItem('salesData', JSON.stringify(allSales)); }, [allSales]);
-  useEffect(() => { localStorage.setItem('appUsers', JSON.stringify(appUsers)); }, [appUsers]);
-  useEffect(() => { localStorage.setItem('appEvents', JSON.stringify(appEvents)); }, [appEvents]);
-  useEffect(() => { localStorage.setItem('appProducts', JSON.stringify(appProducts)); }, [appProducts]);
+  // Fetch initial data from the backend API
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch('/api/data');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to fetch data');
+        }
+        const data = await response.json();
+        setAppUsers(data.appUsers);
+        setAppEvents(data.appEvents);
+        setAppProducts(data.appProducts);
+        setAllSales(data.allSales);
+      } catch (e: any) {
+        setDbError(e.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchInitialData();
+  }, []);
 
 
   const handleInitialSetupComplete = (setupData: InitialSetupData) => {
@@ -69,44 +80,53 @@ const App: React.FC = () => {
   };
 
   const handleCreateUser = async (name: string) => {
-      if (appUsers.some(u => u.name.trim().toLowerCase() === name.trim().toLowerCase())) return; // Ignore duplicates
-      setAppUsers(prev => [...prev, { name }]);
+      if (appUsers.some(u => u.name.trim().toLowerCase() === name.trim().toLowerCase())) return;
+      await fetch('/api/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'user', name }),
+      });
+      setAppUsers(prev => [...prev, { name }].sort((a,b) => a.name.localeCompare(b.name)));
   };
 
   const handleCreateEvent = async (name: string, date: string) => {
-      if (appEvents.some(e => e.name.trim().toLowerCase() === name.trim().toLowerCase())) return; // Ignore duplicates
-      setAppEvents(prev => [...prev, { name, date }]);
+      if (appEvents.some(e => e.name.trim().toLowerCase() === name.trim().toLowerCase())) return;
+      await fetch('/api/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'event', name, date }),
+      });
+      setAppEvents(prev => [...prev, { name, date }].sort((a,b) => a.name.localeCompare(b.name)));
   };
 
   const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
-      try {
-          if (isEditing && editingSaleId) {
-              const originalSale = allSales.find(s => s.id === editingSaleId);
-              const updatedSale: SalesData = {
-                  ...saleData,
-                  id: editingSaleId,
-                  created_at: originalSale?.created_at || new Date().toISOString(), // Preserve original creation date
-              };
-              setAllSales(prev => prev.map(s => s.id === editingSaleId ? updatedSale : s));
-              setLightboxMessage({ type: 'success', text: 'Venda atualizada com sucesso!' });
-          } else {
-              const newSale: SalesData = {
-                  ...saleData,
-                  id: crypto.randomUUID(),
-                  created_at: new Date().toISOString(),
-              };
-              setAllSales(prev => [newSale, ...prev]);
-              setLightboxMessage({ type: 'success', text: 'Venda registrada com sucesso!' });
-          }
-      } catch (error: any) {
-          setLightboxMessage({ type: 'error', text: 'Ocorreu um erro ao salvar a venda.' });
+    try {
+      const response = await fetch('/api/sales', {
+          method: isEditing ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(saleData)
+      });
+      if (!response.ok) throw new Error(await response.text());
+      const { sale: savedSale } = await response.json();
+      
+      if (isEditing) {
+          setAllSales(prev => prev.map(s => s.id === savedSale.id ? savedSale : s));
+          setLightboxMessage({ type: 'success', text: 'Venda atualizada com sucesso!' });
+      } else {
+          setAllSales(prev => [savedSale, ...prev]);
+          setLightboxMessage({ type: 'success', text: 'Venda registrada com sucesso!' });
       }
-      setEditingSaleId(null);
+    } catch (error: any) {
+        setLightboxMessage({ type: 'error', text: 'Ocorreu um erro ao salvar a venda.' });
+    }
+    setEditingSaleId(null);
   };
 
   const handleDeleteSale = async (saleId: string) => {
     if (!window.confirm("Tem certeza que deseja excluir esta venda?")) return;
     try {
+        const response = await fetch(`/api/sales/${saleId}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Failed to delete sale from server.');
         setAllSales(prev => prev.filter(s => s.id !== saleId));
         setLightboxMessage({ type: 'success', text: 'Venda excluída com sucesso.' });
     } catch (error: any) {
@@ -118,6 +138,9 @@ const App: React.FC = () => {
     const salesCount = allSales.filter(s => s.nomeEvento === eventName).length;
     if (!window.confirm(`Tem certeza que deseja apagar o evento "${eventName}" e todas as suas ${salesCount} vendas associadas? Esta ação é irreversível.`)) return;
     try {
+        const response = await fetch(`/api/events/${encodeURIComponent(eventName)}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Failed to delete event from server.');
+        
         setAppEvents(prev => prev.filter(e => e.name !== eventName));
         setAllSales(prev => prev.filter(s => s.nomeEvento !== eventName));
         setFilterEvent('');
@@ -128,8 +151,20 @@ const App: React.FC = () => {
   };
 
   const handleSaveProduct = async (product: ProdutoInfo, originalName?: string) => {
+    const isEditing = !!originalName;
+    const response = await fetch('/api/products', {
+        method: isEditing ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product, originalName })
+    });
+
+    if (!response.ok) {
+        const { error } = await response.json();
+        throw new Error(error || 'Failed to save product.');
+    }
+    
     setAppProducts(prev => {
-        const updated = originalName
+        const updated = isEditing
             ? prev.map(p => p.name === originalName ? product : p)
             : [...prev, product];
         return updated.sort((a, b) => a.name.localeCompare(b.name));
@@ -137,7 +172,16 @@ const App: React.FC = () => {
   };
 
   const handleDeleteProduct = async (productName: string) => {
-      setAppProducts(prev => prev.filter(p => p.name !== productName));
+    const response = await fetch('/api/products', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productName })
+    });
+     if (!response.ok) {
+        const { error } = await response.json();
+        throw new Error(error || 'Failed to delete product.');
+    }
+    setAppProducts(prev => prev.filter(p => p.name !== productName));
   };
   
   const handleSetEditingSale = (saleId: string | null) => {
@@ -157,15 +201,9 @@ const App: React.FC = () => {
 
   const handleCancelEdit = () => setEditingSaleId(null);
 
-  const uniqueEvents = useMemo<EventDetail[]>(() => {
-    return [...appEvents].sort((a,b) => a.name.localeCompare(b.name));
-  }, [appEvents]);
+  const uniqueEvents = useMemo<EventDetail[]>(() => [...appEvents], [appEvents]);
+  const uniqueUsers = useMemo<UserDetail[]>(() => [...appUsers], [appUsers]);
 
-  const uniqueUsers = useMemo<UserDetail[]>(() => {
-    return [...appUsers].sort((a, b) => a.name.localeCompare(b.name));
-  }, [appUsers]);
-
-  
   const filteredSales = useMemo(() => {
     return allSales.filter(sale => {
       const searchTermLower = searchTerm.toLowerCase();
@@ -178,7 +216,7 @@ const App: React.FC = () => {
       const matchesEvent = filterEvent ? sale.nomeEvento === filterEvent : true;
       const matchesUser = filterUser ? sale.nomeUsuario === filterUser : true;
       return matchesSearch && matchesEvent && matchesUser;
-    }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }); // Sorting is now done server-side
   }, [allSales, searchTerm, filterEvent, filterUser]);
 
   const navigateToDashboard = () => setCurrentView('dashboard');
@@ -208,13 +246,27 @@ const App: React.FC = () => {
 
   const saleBeingEdited = editingSaleId ? allSales.find(s => s.id === editingSaleId) || null : null;
   
+  if (isLoading) {
+      return (
+          <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 text-white text-center">
+              <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-24 w-auto mb-8" />
+              <h1 className="text-2xl font-semibold">Carregando Dados...</h1>
+              <p className="text-gray-400">Conectando ao banco de dados.</p>
+          </div>
+      );
+  }
+
+  if (dbError) {
+      return <DatabaseErrorScreen error={dbError} />;
+  }
+  
   if (!appPassword) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 text-white text-center">
         <img src="https://res.cloudinary.com/dqg7yc1du/image/upload/v1753963017/Logo_TMC_mnj699.png" alt="Logo da Empresa" className="h-24 w-auto mb-8" />
         <div className="bg-slate-800 p-8 rounded-lg shadow-2xl">
           <h1 className="text-2xl text-red-400 font-bold">Erro de Configuração</h1>
-          <p className="text-lg text-gray-300 mt-2">A senha de acesso não foi configurada.</p>
+          <p className="text-lg text-gray-300 mt-2">A senha de acesso (VITE_APP_PASSWORD) não foi configurada.</p>
         </div>
       </div>
     );
@@ -274,7 +326,6 @@ const App: React.FC = () => {
                   editingSale={saleBeingEdited} 
                   onCancelEdit={handleCancelEdit} 
                   paymentMethods={PAYMENT_METHODS}
-                  allSales={allSales}
                   appProducts={appProducts}
                   currentUser={currentUser} 
                   currentEventName={currentEventName} 

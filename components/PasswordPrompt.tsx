@@ -4,7 +4,7 @@ import { XMarkIcon } from './icons';
 interface PasswordPromptProps {
   onClose: () => void;
   onSuccess: () => void;
-  appPassword: string;
+  appPassword?: string;
 }
 
 const PasswordPrompt: React.FC<PasswordPromptProps> = ({ onClose, onSuccess, appPassword }) => {

@@ -9,7 +9,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     editingSale,
     onCancelEdit,
     paymentMethods,
-    allSales,
     appProducts,
     currentUser, 
     currentEventName, 
@@ -33,8 +32,8 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     cep: '',
     formaPagamento: '',
     valorTotal: 0,
-    id: '',
-    created_at: '',
+    id: crypto.randomUUID(), // Pre-generate ID on client
+    created_at: new Date().toISOString(),
     nomeUsuario: currentUser,
     nomeEvento: currentEventName,
     dataEvento: currentEventDate,
@@ -129,36 +128,25 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     }
   };
 
-  const handleCPFBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleCPFBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
     const cpf = e.target.value;
 
-    if (!validateCPF(cpf)) {
-        return;
-    }
-
+    if (!validateCPF(cpf)) return;
     if (isEditing) return; 
     
-    if (cpf && allSales.length > 0) {
-      const existingSale = [...allSales].reverse().find(sale => sale.cpf === cpf);
-      if (existingSale) {
-        setFormData(prev => ({
-          ...prev,
-          primeiroNome: existingSale.primeiroNome,
-          sobrenome: existingSale.sobrenome,
-          email: existingSale.email,
-          ddd: existingSale.ddd,
-          telefoneNumero: existingSale.telefoneNumero,
-          logradouroRua: existingSale.logradouroRua,
-          numeroEndereco: existingSale.numeroEndereco,
-          complemento: existingSale.complemento,
-          bairro: existingSale.bairro,
-          cidade: existingSale.cidade,
-          estado: existingSale.estado,
-          cep: existingSale.cep,
-        }));
-        onNotify({ type: 'info', text: "Dados do cliente preenchidos com base no CPF." });
-        if (existingSale.ddd) validateDDD(existingSale.ddd);
-      }
+    if (cpf) {
+        try {
+            const response = await fetch(`/api/customers/${encodeURIComponent(cpf)}`);
+            if (response.ok) {
+                const customerData = await response.json();
+                setFormData(prev => ({ ...prev, ...customerData }));
+                onNotify({ type: 'info', text: "Dados do cliente preenchidos com base no CPF." });
+            } else if (response.status !== 404) {
+                 onNotify({ type: 'error', text: "Erro ao buscar dados do cliente." });
+            }
+        } catch (error) {
+            onNotify({ type: 'error', text: "Falha na comunicação com o servidor ao buscar CPF." });
+        }
     }
   };
 
@@ -259,11 +247,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
         produtos: selectedProducts,
         valorTotal: totalVenda,
       };
-  
-      if (isEditing && editingSale) {
-        salePayload.id = editingSale.id;
-        salePayload.created_at = editingSale.created_at;
-      }
   
       await onSaveSale(salePayload, isEditing);
   

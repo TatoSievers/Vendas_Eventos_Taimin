@@ -36,8 +36,12 @@ const ProductManager: React.FC<ProductManagerProps> = ({ products, onSave, onDel
 
   const handleDeleteClick = async (productNameToDelete: string) => {
     if (window.confirm(`Tem certeza que deseja excluir o produto "${productNameToDelete}"?`)) {
-      await onDelete(productNameToDelete);
-      onNotify({ type: 'success', text: 'Produto excluído com sucesso.' });
+        try {
+            await onDelete(productNameToDelete);
+            onNotify({ type: 'success', text: 'Produto excluído com sucesso.' });
+        } catch (error: any) {
+            onNotify({ type: 'error', text: error.message || 'Falha ao excluir o produto.' });
+        }
     }
   };
 
@@ -54,16 +58,6 @@ const ProductManager: React.FC<ProductManagerProps> = ({ products, onSave, onDel
         return;
     }
     
-    const isDuplicate = products.some(p => 
-        p.name.toLowerCase() === trimmedName.toLowerCase() && 
-        p.name !== editingProductOriginalName
-    );
-
-    if (isDuplicate) {
-        onNotify({ type: 'error', text: 'Um produto com este nome já existe.' });
-        return;
-    }
-
     setIsSubmitting(true);
     try {
       await onSave(formData, isEditing ? editingProductOriginalName ?? undefined : undefined);
@@ -71,7 +65,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({ products, onSave, onDel
       setFormData(initialFormState);
       setEditingProductOriginalName(null);
     } catch (error: any) {
-      onNotify({ type: 'error', text: 'Falha ao salvar o produto.' });
+      onNotify({ type: 'error', text: error.message || 'Falha ao salvar o produto.' });
     } finally {
       setIsSubmitting(false);
     }
