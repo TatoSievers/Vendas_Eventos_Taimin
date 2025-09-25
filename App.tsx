@@ -101,10 +101,18 @@ const App: React.FC = () => {
   const appPassword = (import.meta as any).env.VITE_APP_PASSWORD;
 
   const handleApiError = async (response: Response, action: string): Promise<string> => {
-      let errorMessage = `Erro ao ${action}.`;
+      let errorMessage = `Erro ${response.status} ao ${action}.`;
       try {
-          const errorData = await response.json();
-          errorMessage = errorData.details || errorData.error || `Erro ${response.status} ao ${action}.`;
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+              const errorData = await response.json();
+              errorMessage = errorData.details || errorData.error || errorMessage;
+          } else {
+              const errorText = await response.text();
+              if (errorText) {
+                errorMessage = errorText;
+              }
+          }
       } catch (e) {
           errorMessage = `Erro de comunicação com o servidor ao ${action}.`;
       }
@@ -122,7 +130,12 @@ const App: React.FC = () => {
         const response = await fetch('/api/data');
         if (!response.ok) {
             const errorText = await handleApiError(response, 'carregar dados');
-            if (errorText.toLowerCase().includes('does not exist') || errorText.toLowerCase().includes('could not find the table')) {
+            const lowerErrorText = errorText.toLowerCase();
+            if (
+              lowerErrorText.includes('does not exist') ||
+              lowerErrorText.includes('could not find table') ||
+              lowerErrorText.includes('schema cache')
+            ) {
                 setIsDbError(true);
             } else {
                 throw new Error(errorText);
