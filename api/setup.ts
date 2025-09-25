@@ -1,4 +1,4 @@
-import pool from './lib/db';
+import pool from '../lib/db';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const CREATE_HANDLERS: { [key: string]: (payload: any) => Promise<any> } = {

@@ -1,4 +1,4 @@
-import pool from '../lib/db';
+import pool from '../../lib/db';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 async function handleDelete(req: VercelRequest, res: VercelResponse) {
