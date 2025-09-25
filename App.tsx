@@ -1,6 +1,5 @@
-// Fix: Add triple-slash directive for Vite client types to resolve errors with `import.meta.env`.
-/// <reference types="vite/client" />
-
+// Fix: Removed the 'vite/client' triple-slash directive that was causing a type resolution error.
+// The necessary types for 'import.meta.env' are now defined in 'types.ts' to resolve the issue.
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import SalesForm from './components/SalesForm';
 import InitialSetupForm from './components/InitialSetupForm';
@@ -53,8 +52,16 @@ const App: React.FC = () => {
         setIsLoading(true);
         const response = await fetch('/api/data');
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to fetch data');
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.indexOf("application/json") !== -1) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to fetch data with status: ${response.status}`);
+          } else {
+            // The error is not in JSON format, probably an HTML error page from the server/proxy
+            const textError = await response.text();
+            console.error("Non-JSON error response:", textError); // Log for debugging
+            throw new Error(textError || `A server error occurred: ${response.statusText}`);
+          }
         }
         const data = await response.json();
         setAppUsers(data.appUsers);

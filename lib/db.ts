@@ -1,5 +1,5 @@
 import { neon, neonConfig } from '@neondatabase/serverless';
-import { VercelRequest } from '@vercel/node';
+import { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Required for Vercel/Neon connection
 // See: https://neon.tech/docs/serverless/serverless-driver#get-a-connection-string
@@ -107,16 +107,18 @@ export async function initDb() {
 }
 
 // Higher-order function to wrap API handlers with DB initialization and error handling
-export const withDbConnection = (handler: (req: VercelRequest) => Promise<any>) => 
-  async (req: VercelRequest) => {
-    try {
-      await initDb();
-      return await handler(req);
-    } catch (error: any) {
-      console.error('API Handler Error:', error);
+export const withDbConnection = (
+  handler: (req: VercelRequest, res: VercelResponse) => Promise<void | VercelResponse>
+) => async (req: VercelRequest, res: VercelResponse) => {
+  try {
+    await initDb();
+    await handler(req, res);
+  } catch (error: any) {
+    console.error('API Handler Error:', error);
+    if (!res.headersSent) {
       const status = error.status || 500;
       const message = error.message || 'An internal server error occurred.';
-      // This is not a real Response object, but Vercel's framework will handle it
-      return new Response(JSON.stringify({ error: message }), { status });
+      res.status(status).json({ error: message });
     }
-  };
+  }
+};

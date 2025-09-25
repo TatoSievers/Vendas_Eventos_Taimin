@@ -1,3 +1,12 @@
+// Fix: Manually define types for import.meta.env as a workaround for vite/client type issues.
+interface ImportMetaEnv {
+  readonly VITE_APP_PASSWORD?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
 import React from 'react';
 
 // Este arquivo define os "formatos" ou "modelos" de dados para toda a aplicação.
