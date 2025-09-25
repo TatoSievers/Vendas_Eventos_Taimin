@@ -7,6 +7,7 @@ import Lightbox from './components/Lightbox';
 import Header from './components/Header';
 import { SalesData, EventDetail, UserDetail, InitialSetupData, PaymentMethodDetail, LightboxMessage } from './types';
 import PasswordScreen from './components/PasswordScreen';
+import DatabaseErrorScreen from './components/DatabaseErrorScreen';
 
 // --- Funções Auxiliares para Mapeamento de Dados ---
 const fromDatabaseRecord = (dbRecord: { [key: string]: any }): any => {
@@ -77,6 +78,8 @@ type AppView = 'setup' | 'salesFormAndList' | 'dashboard';
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
+  const [isDbError, setIsDbError] = useState<boolean>(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [allSales, setAllSales] = useState<SalesData[]>([]);
   const [currentView, setCurrentView] = useState<AppView>('setup');
   
@@ -101,7 +104,7 @@ const App: React.FC = () => {
       let errorMessage = `Erro ao ${action}.`;
       try {
           const errorData = await response.json();
-          errorMessage = errorData.error || `Erro ${response.status} ao ${action}.`;
+          errorMessage = errorData.details || errorData.error || `Erro ${response.status} ao ${action}.`;
       } catch (e) {
           errorMessage = `Erro de comunicação com o servidor ao ${action}.`;
       }
@@ -114,17 +117,25 @@ const App: React.FC = () => {
 
     const fetchInitialData = async () => {
       setIsDataLoaded(false);
+      setIsDbError(false);
       try {
         const response = await fetch('/api/data');
-        if (!response.ok) throw new Error(await handleApiError(response, 'carregar dados'));
-
-        const { sales, users, events, paymentMethods } = await response.json();
-        
-        const formattedSales = sales.map((dbSale: any) => fromDatabaseRecord(dbSale)) as SalesData[];
-        setAllSales(formattedSales);
-        setAppUsers(users || []);
-        setAppEvents(events || []);
-        setAppPaymentMethods(paymentMethods || []);
+        if (!response.ok) {
+            const errorText = await handleApiError(response, 'carregar dados');
+            if (errorText.toLowerCase().includes('does not exist') || errorText.toLowerCase().includes('could not find the table')) {
+                setIsDbError(true);
+            } else {
+                throw new Error(errorText);
+            }
+        } else {
+            const { sales, users, events, paymentMethods } = await response.json();
+            
+            const formattedSales = sales.map((dbSale: any) => fromDatabaseRecord(dbSale)) as SalesData[];
+            setAllSales(formattedSales);
+            setAppUsers(users || []);
+            setAppEvents(events || []);
+            setAppPaymentMethods(paymentMethods || []);
+        }
 
       } catch (error: any) {
         setLightboxMessage({ type: 'error', text: error.message || "Ocorreu um erro inesperado ao carregar os dados." });
@@ -135,7 +146,11 @@ const App: React.FC = () => {
     };
 
     fetchInitialData();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, retryCount]);
+
+  const handleRetryDbConnection = () => {
+    setRetryCount(c => c + 1);
+  };
 
   const handleInitialSetupComplete = (setupData: InitialSetupData) => {
     setCurrentUser(setupData.userName);
@@ -341,6 +356,10 @@ const App: React.FC = () => {
     return <PasswordScreen onCorrectPassword={() => setIsAuthenticated(true)} appPassword={appPassword} />;
   }
   
+  if (isDbError) {
+    return <DatabaseErrorScreen onRetry={handleRetryDbConnection} />;
+  }
+
   if (!isDataLoaded) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 text-white text-center">
