@@ -169,7 +169,12 @@ const App: React.FC = () => {
   const handleDeleteSale = async (saleId: string) => {
     if (!window.confirm("Tem certeza que deseja excluir esta venda?")) return;
     try {
-        const response = await fetch(`/api/sales/${saleId}`, { method: 'DELETE' });
+        const response = await fetch(`/api/sales/${saleId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.details || errorData.error || `Falha na comunicação com o servidor (Status: ${response.status}).`);
