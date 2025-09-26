@@ -2,11 +2,10 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { withDbConnection, query } from './lib/db.js';
 
 // Helper function to format date to YYYY-MM-DD, handling potential nulls/invalid dates.
-// It uses UTC functions to avoid timezone-related date shifts.
 const formatDateToYYYYMMDD = (dateInput: string | Date | null): string => {
   if (!dateInput) return ''; 
   const d = new Date(dateInput);
-  if (isNaN(d.getTime())) return ''; // Return empty for invalid dates
+  if (isNaN(d.getTime())) return '';
   
   const year = d.getUTCFullYear();
   const month = String(d.getUTCMonth() + 1).padStart(2, '0');
@@ -14,6 +13,18 @@ const formatDateToYYYYMMDD = (dateInput: string | Date | null): string => {
   return `${year}-${month}-${day}`;
 };
 
+// Helper to ensure data types from the database are correctly formatted for the client.
+const formatSaleForClient = (sale: any) => {
+  return {
+    ...sale,
+    dataEvento: formatDateToYYYYMMDD(sale.dataEvento),
+    valorTotal: parseFloat(sale.valorTotal || 0), // Ensure valorTotal is a number
+    produtos: (sale.produtos || []).map((p: any) => ({
+      ...p,
+      preco_unitario: parseFloat(p.preco_unitario || 0) // Ensure preco_unitario is a number
+    })),
+  };
+};
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
   if (req.method !== 'GET') {
@@ -21,14 +32,13 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
   }
 
   try {
-    // Fetch all data in parallel
     const [usersResult, eventsResult, productsResult, salesResult] = await Promise.all([
       query('SELECT name FROM users ORDER BY name ASC'),
       query('SELECT name, date FROM events ORDER BY name ASC'),
       query('SELECT name, preco, status FROM products ORDER BY name ASC'),
       query(`
         SELECT 
-          s.id, s.created_at, s.forma_pagamento, s.valor_total, s.observacao,
+          s.id, s.created_at, s.forma_pagamento, s.valor_total as "valorTotal", s.observacao,
           u.name as "nomeUsuario",
           e.name as "nomeEvento", e.date as "dataEvento",
           c.primeiro_nome as "primeiroNome", c.sobrenome, c.cpf, c.email, c.ddd, c.telefone_numero as "telefoneNumero",
@@ -51,7 +61,6 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
       `),
     ]);
     
-    // Vercel/Neon returns rows in a flat structure, we need to map them
     const appUsers = usersResult.map((r: any) => ({ name: r.name }));
     const appEvents = eventsResult.map((r: any) => ({ 
         name: r.name, 
@@ -59,13 +68,8 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
     }));
     const appProducts = productsResult.map((r: any) => ({ name: r.name, preco: parseFloat(r.preco), status: r.status }));
     
-    // Ensure produtos is an array and dataEvento is correctly formatted
-    const allSales = salesResult.map((r: any) => ({
-        ...r, 
-        dataEvento: formatDateToYYYYMMDD(r.dataEvento),
-        produtos: r.produtos || [] 
-    }));
-
+    // Apply consistent formatting to all sales data before sending it to the client
+    const allSales = salesResult.map(formatSaleForClient);
 
     return res.status(200).json({
       appUsers,

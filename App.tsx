@@ -1,5 +1,12 @@
-/// <reference types="vite/client" />
-// FIX: The triple-slash directive above must be the absolute first line in the file for TypeScript to recognize Vite client types, which fixes errors with `import.meta.env`.
+// FIX: Manually define types for Vite's `import.meta.env` as the original `/// <reference types="vite/client" />` directive was failing to resolve. This fixes both the type definition error and the error for accessing `import.meta.env`.
+declare global {
+  interface ImportMeta {
+    readonly env: {
+      readonly VITE_APP_PASSWORD: string;
+    }
+  }
+}
+
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import SalesForm from './components/SalesForm';
 import InitialSetupForm from './components/InitialSetupForm';

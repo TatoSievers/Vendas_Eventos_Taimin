@@ -2,6 +2,30 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { withDbConnection, query } from './lib/db.js';
 import { SalesData } from '../types';
 
+// Helper function to format date to YYYY-MM-DD
+const formatDateToYYYYMMDD = (dateInput: string | Date | null): string => {
+  if (!dateInput) return ''; 
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Helper to ensure data types from the database are correctly formatted for the client.
+const formatSaleForClient = (sale: any) => {
+  return {
+    ...sale,
+    dataEvento: formatDateToYYYYMMDD(sale.dataEvento),
+    valorTotal: parseFloat(sale.valorTotal || 0),
+    produtos: (sale.produtos || []).map((p: any) => ({
+      ...p,
+      preco_unitario: parseFloat(p.preco_unitario || 0)
+    })),
+  };
+};
+
 const handler = async (req: VercelRequest, res: VercelResponse) => {
   if (req.method === 'POST') {
     return createOrUpdateSale(req, res);
@@ -16,23 +40,12 @@ async function createOrUpdateSale(req: VercelRequest, res: VercelResponse, isEdi
   const saleData: SalesData = req.body;
 
   try {
-    // Step 1: Upsert customer and get their ID. This is an atomic operation.
+    // Step 1: Upsert customer and get their ID.
     const customerResult = await query(`
       INSERT INTO customers (cpf, primeiro_nome, sobrenome, email, ddd, telefone_numero, cep, logradouro_rua, numero_endereco, complemento, bairro, cidade, estado)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       ON CONFLICT (cpf) DO UPDATE SET
-        primeiro_nome = EXCLUDED.primeiro_nome,
-        sobrenome = EXCLUDED.sobrenome,
-        email = EXCLUDED.email,
-        ddd = EXCLUDED.ddd,
-        telefone_numero = EXCLUDED.telefone_numero,
-        cep = EXCLUDED.cep,
-        logradouro_rua = EXCLUDED.logradouro_rua,
-        numero_endereco = EXCLUDED.numero_endereco,
-        complemento = EXCLUDED.complemento,
-        bairro = EXCLUDED.bairro,
-        cidade = EXCLUDED.cidade,
-        estado = EXCLUDED.estado
+        primeiro_nome = EXCLUDED.primeiro_nome, sobrenome = EXCLUDED.sobrenome, email = EXCLUDED.email, ddd = EXCLUDED.ddd, telefone_numero = EXCLUDED.telefone_numero, cep = EXCLUDED.cep, logradouro_rua = EXCLUDED.logradouro_rua, numero_endereco = EXCLUDED.numero_endereco, complemento = EXCLUDED.complemento, bairro = EXCLUDED.bairro, cidade = EXCLUDED.cidade, estado = EXCLUDED.estado
       RETURNING id;
     `, [
         saleData.cpf, saleData.primeiroNome, saleData.sobrenome, saleData.email, saleData.ddd, saleData.telefoneNumero, saleData.cep, saleData.logradouroRua, saleData.numeroEndereco, saleData.complemento, saleData.bairro, saleData.cidade, saleData.estado
@@ -56,12 +69,7 @@ async function createOrUpdateSale(req: VercelRequest, res: VercelResponse, isEdi
       INSERT INTO sales (id, created_at, user_id, event_id, customer_id, forma_pagamento, valor_total, observacao)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       ON CONFLICT (id) DO UPDATE SET
-        user_id = EXCLUDED.user_id,
-        event_id = EXCLUDED.event_id,
-        customer_id = EXCLUDED.customer_id,
-        forma_pagamento = EXCLUDED.forma_pagamento,
-        valor_total = EXCLUDED.valor_total,
-        observacao = EXCLUDED.observacao;
+        user_id = EXCLUDED.user_id, event_id = EXCLUDED.event_id, customer_id = EXCLUDED.customer_id, forma_pagamento = EXCLUDED.forma_pagamento, valor_total = EXCLUDED.valor_total, observacao = EXCLUDED.observacao;
     `, [
         saleId, saleData.created_at, userId, eventId, customerId,
         saleData.formaPagamento, saleData.valorTotal, saleData.observacao
@@ -74,19 +82,13 @@ async function createOrUpdateSale(req: VercelRequest, res: VercelResponse, isEdi
 
     // Step 4: Insert sale products associations
     if (saleData.produtos && saleData.produtos.length > 0) {
-        // Fetch all needed product IDs in one query for efficiency
         const productNames = saleData.produtos.map(p => p.nomeProduto);
-        const productIdsResult = await query(
-            `SELECT id, name FROM products WHERE name = ANY($1::text[])`, 
-            [productNames]
-        );
+        const productIdsResult = await query(`SELECT id, name FROM products WHERE name = ANY($1::text[])`, [productNames]);
         const productIdMap = new Map(productIdsResult.map((p: any) => [p.name, p.id]));
 
         for (const product of saleData.produtos) {
             const productId = productIdMap.get(product.nomeProduto);
-            if (!productId) {
-                throw new Error(`Produto '${product.nomeProduto}' não encontrado no banco de dados.`);
-            }
+            if (!productId) throw new Error(`Produto '${product.nomeProduto}' não encontrado no banco de dados.`);
             await query(`
                 INSERT INTO sale_products (sale_id, product_id, unidades, preco_unitario)
                 VALUES ($1, $2, $3, $4);
@@ -97,7 +99,7 @@ async function createOrUpdateSale(req: VercelRequest, res: VercelResponse, isEdi
     // After successful transaction, fetch the complete sale data to return
     const newSaleResult = await query(`
       SELECT 
-        s.id, s.created_at, s.forma_pagamento, s.valor_total, s.observacao,
+        s.id, s.created_at, s.forma_pagamento, s.valor_total as "valorTotal", s.observacao,
         u.name as "nomeUsuario",
         e.name as "nomeEvento", e.date as "dataEvento",
         c.primeiro_nome as "primeiroNome", c.sobrenome, c.cpf, c.email, c.ddd, c.telefone_numero as "telefoneNumero",
@@ -123,9 +125,9 @@ async function createOrUpdateSale(req: VercelRequest, res: VercelResponse, isEdi
       throw new Error('Não foi possível recuperar os dados da venda após o salvamento.');
     }
 
-    const newSaleData = {...newSaleResult[0], produtos: newSaleResult[0].produtos || [] };
+    const formattedSale = formatSaleForClient(newSaleResult[0]);
 
-    return res.status(isEditing ? 200 : 201).json({ sale: newSaleData });
+    return res.status(isEditing ? 200 : 201).json({ sale: formattedSale });
 
   } catch (error: any) {
     console.error('Sale creation/update failed:', error);
