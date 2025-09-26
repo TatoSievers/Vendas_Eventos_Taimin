@@ -1,7 +1,7 @@
-/// <reference types="vite/client" />
 // Fix: The triple-slash directive must be at the absolute top of the file.
 // This ensures that Vite's client-side type definitions are loaded correctly,
 // resolving errors related to `import.meta.env`.
+/// <reference types="vite/client" />
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import SalesForm from './components/SalesForm';
 import InitialSetupForm from './components/InitialSetupForm';
@@ -43,9 +43,8 @@ const App: React.FC = () => {
   const [isProductManagerOpen, setIsProductManagerOpen] = useState<boolean>(false);
   const [isProductManagerPasswordPromptOpen, setIsProductManagerPasswordPromptOpen] = useState<boolean>(false);
   
-  // Use VITE_APP_PASSWORD from .env file for security, with a fallback for convenience.
-  // In Vercel, this should be set as an environment variable.
-  const appPassword = import.meta.env.VITE_APP_PASSWORD || '12';
+  // The application password must be set as an environment variable `VITE_APP_PASSWORD`.
+  const appPassword = import.meta.env.VITE_APP_PASSWORD;
 
   // Fetch initial data from the backend API
   useEffect(() => {
