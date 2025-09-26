@@ -97,7 +97,17 @@ export async function initDb() {
   if (dbInitialized) return;
   console.log("Initializing database schema...");
   try {
-    await query(dbSchema);
+    // The @neondatabase/serverless driver does not support multi-statement queries.
+    // We must split the schema into individual statements and execute them one by one.
+    const statements = dbSchema
+      .split(';')
+      .map(statement => statement.trim())
+      .filter(statement => statement.length > 0);
+
+    for (const statement of statements) {
+      await query(statement);
+    }
+    
     dbInitialized = true;
     console.log("Database schema initialized successfully.");
   } catch (error) {
