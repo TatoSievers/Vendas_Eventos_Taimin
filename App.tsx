@@ -1,8 +1,4 @@
-// FIX: The triple-slash directive must be at the top of the file, but can be preceded by comments.
-// Swapping the order of the comment and the directive to ensure it is processed correctly by the compiler.
-// Fix: The triple-slash directive must be at the absolute top of the file.
-// This ensures that Vite's client-side type definitions are loaded correctly,
-// resolving errors related to `import.meta.env`.
+// FIX: The triple-slash directive `/// <reference types="vite/client" />` must be at the absolute top of the file to be correctly processed by TypeScript. It was previously preceded by comments, which caused Vite's client types not to be loaded, leading to errors with `import.meta.env`.
 /// <reference types="vite/client" />
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import SalesForm from './components/SalesForm';

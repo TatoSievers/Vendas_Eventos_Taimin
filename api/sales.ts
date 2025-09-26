@@ -80,7 +80,7 @@ async function createOrUpdateSale(req: VercelRequest, res: VercelResponse, isEdi
             `SELECT id, name FROM products WHERE name = ANY($1::text[])`, 
             [productNames]
         );
-        const productIdMap = new Map(productIdsResult.map((p: {id: number; name: string}) => [p.name, p.id]));
+        const productIdMap = new Map(productIdsResult.map((p: any) => [p.name, p.id]));
 
         for (const product of saleData.produtos) {
             const productId = productIdMap.get(product.nomeProduto);
