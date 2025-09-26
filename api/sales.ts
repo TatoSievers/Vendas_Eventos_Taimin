@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { withDbConnection, query } from './lib/db';
+import { withDbConnection, query } from './lib/db.js';
 import { SalesData } from '../types';
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
