@@ -1,12 +1,13 @@
+// Conteúdo completo para o arquivo: api/sales/[id].ts
+
 import { VercelRequest, VercelResponse } from '@vercel/node';
-// Fix: Corrected relative path to the db module.
-import { withDbConnection, query } from '../lib/db.js';
+import { withDbConnection, query } from '../lib/db.js'; // Garanta que este caminho está correto
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
-  // Debugging line as requested to identify the method received by the function.
-  console.log('Método recebido:', req.method);
+  // --- LINHA DE DIAGNÓSTICO ADICIONADA ---
+  // Esta linha é crucial para registrar o método HTTP recebido pela função.
+  console.log(`MÉTODO HTTP RECEBIDO: ${req.method}`);
 
-  // Explicitly handle the browser's CORS preflight OPTIONS request.
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -19,7 +20,6 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
     }
 
     try {
-      // The ON DELETE CASCADE directive in the 'sale_products' table will handle deleting related items.
       await query('DELETE FROM sales WHERE id = $1', [id]);
       return res.status(200).json({ message: 'Sale deleted successfully.' });
     } catch (error: any) {
@@ -28,7 +28,6 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
     }
   }
 
-  // If the method is not handled above, it is not allowed.
   res.setHeader('Allow', ['DELETE', 'OPTIONS']);
   return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 };
