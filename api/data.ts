@@ -15,10 +15,10 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
       query(`
         SELECT 
           s.id, s.created_at, s.forma_pagamento, s.valor_total, s.observacao,
-          u.name as nomeUsuario,
-          e.name as nomeEvento, e.date as dataEvento,
-          c.primeiro_nome as primeiroNome, c.sobrenome, c.cpf, c.email, c.ddd, c.telefone_numero as telefoneNumero,
-          c.logradouro_rua as logradouroRua, c.numero_endereco as numeroEndereco, c.complemento, c.bairro, c.cidade, c.estado, c.cep,
+          u.name as "nomeUsuario",
+          e.name as "nomeEvento", e.date as "dataEvento",
+          c.primeiro_nome as "primeiroNome", c.sobrenome, c.cpf, c.email, c.ddd, c.telefone_numero as "telefoneNumero",
+          c.logradouro_rua as "logradouroRua", c.numero_endereco as "numeroEndereco", c.complemento, c.bairro, c.cidade, c.estado, c.cep,
           (
             SELECT json_agg(json_build_object(
               'nomeProduto', p.name,
