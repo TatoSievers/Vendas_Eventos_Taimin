@@ -1,11 +1,7 @@
 
 
-// Fix: Add a reference to Vite's client types to make `import.meta.env` available.
-/// <reference types="vite/client" />
-
-// Since `vite/client` types might not be found in some environments,
-// we manually define `ImportMeta` and augment `ImportMetaEnv` to provide type safety
-// for `import.meta.env` and resolve TypeScript errors.
+// Fix: Removed the reference to "vite/client" which was causing a "Cannot find type definition file" error.
+// The following manual global declarations for `ImportMetaEnv` are sufficient to provide type safety for `import.meta.env`.
 declare global {
     interface ImportMeta {
         readonly env: ImportMetaEnv;

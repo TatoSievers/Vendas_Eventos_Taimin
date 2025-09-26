@@ -2,6 +2,14 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { withDbConnection, query } from '../lib/db.js';
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
+  // Handle preflight OPTIONS requests, which browsers send before certain
+  // requests (including DELETE) to check for permissions.
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Methods', 'DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    return res.status(204).end();
+  }
+  
   const { id } = req.query;
 
   if (typeof id !== 'string') {
@@ -10,9 +18,7 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
 
   if (req.method === 'DELETE') {
     try {
-      // Execute the delete operation. If the ID doesn't exist, this
-      // command will still succeed without error, which is acceptable
-      // for a DELETE request. The ON DELETE CASCADE directive in the
+      // Execute the delete operation. The ON DELETE CASCADE directive in the
       // 'sale_products' table will handle deleting related items.
       await query('DELETE FROM sales WHERE id = $1', [id]);
       
@@ -24,6 +30,8 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
       return res.status(500).json({ error: 'Database query failed', details: error.message });
     }
   } else {
+    // If the method is not DELETE or OPTIONS, it's not allowed.
+    res.setHeader('Allow', 'DELETE, OPTIONS');
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 };
