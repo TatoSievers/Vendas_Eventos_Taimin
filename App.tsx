@@ -139,7 +139,8 @@ const App: React.FC = () => {
 
   const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
     try {
-      const response = await fetch('/api/sales', {
+      const url = isEditing ? `/api/sales/${saleData.id}` : '/api/sales';
+      const response = await fetch(url, {
         method: isEditing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(saleData)

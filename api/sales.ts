@@ -27,19 +27,51 @@ const formatSaleForClient = (sale: any) => {
 };
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
-  // CORS is now handled by vercel.json, so the OPTIONS handler is removed.
-
-  if (req.method === 'POST') {
-    return createOrUpdateSale(req, res);
-  } else if (req.method === 'PUT') {
-    return createOrUpdateSale(req, res, true);
+  if (req.method === 'GET') {
+    return getAllSales(req, res);
+  } else if (req.method === 'POST') {
+    return createSale(req, res);
   } else {
-    res.setHeader('Allow', ['POST', 'PUT']);
+    res.setHeader('Allow', ['GET', 'POST']);
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 };
 
-async function createOrUpdateSale(req: VercelRequest, res: VercelResponse, isEditing = false) {
+async function getAllSales(req: VercelRequest, res: VercelResponse) {
+    try {
+        const salesResult = await query(`
+            SELECT 
+            s.id, s.created_at, s.forma_pagamento, s.valor_total as "valorTotal", s.observacao,
+            u.name as "nomeUsuario",
+            e.name as "nomeEvento", e.date as "dataEvento",
+            c.primeiro_nome as "primeiroNome", c.sobrenome, c.cpf, c.email, c.ddd, c.telefone_numero as "telefoneNumero",
+            c.logradouro_rua as "logradouroRua", c.numero_endereco as "numeroEndereco", c.complemento, c.bairro, c.cidade, c.estado, c.cep,
+            (
+                SELECT json_agg(json_build_object(
+                'nomeProduto', p.name,
+                'unidades', sp.unidades,
+                'preco_unitario', sp.preco_unitario
+                ))
+                FROM sale_products sp
+                JOIN products p ON sp.product_id = p.id
+                WHERE sp.sale_id = s.id
+            ) as produtos
+            FROM sales s
+            JOIN users u ON s.user_id = u.id
+            JOIN events e ON s.event_id = e.id
+            JOIN customers c ON s.customer_id = c.id
+            ORDER BY s.created_at DESC
+        `);
+        const allSales = salesResult.map(formatSaleForClient);
+        return res.status(200).json(allSales);
+    } catch (error: any) {
+        console.error('Failed to fetch sales:', error);
+        return res.status(500).json({ error: 'Failed to fetch sales from the database.', details: error.message });
+    }
+}
+
+
+async function createSale(req: VercelRequest, res: VercelResponse) {
   const saleData: SalesData = req.body;
 
   try {
@@ -67,22 +99,15 @@ async function createOrUpdateSale(req: VercelRequest, res: VercelResponse, isEdi
 
     const saleId = saleData.id; // Use the client-generated UUID
 
-    // Step 3: Insert or Update the sale record
+    // Step 3: Insert the new sale record
     await query(`
       INSERT INTO sales (id, created_at, user_id, event_id, customer_id, forma_pagamento, valor_total, observacao)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (id) DO UPDATE SET
-        user_id = EXCLUDED.user_id, event_id = EXCLUDED.event_id, customer_id = EXCLUDED.customer_id, forma_pagamento = EXCLUDED.forma_pagamento, valor_total = EXCLUDED.valor_total, observacao = EXCLUDED.observacao;
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
     `, [
         saleId, saleData.created_at, userId, eventId, customerId,
         saleData.formaPagamento, saleData.valorTotal, saleData.observacao
     ]);
-
-    // If editing, first clear all old product associations for this sale
-    if (isEditing) {
-      await query('DELETE FROM sale_products WHERE sale_id = $1', [saleId]);
-    }
-
+    
     // Step 4: Insert sale products associations
     if (saleData.produtos && saleData.produtos.length > 0) {
         const productNames = saleData.produtos.map(p => p.nomeProduto);
@@ -130,10 +155,10 @@ async function createOrUpdateSale(req: VercelRequest, res: VercelResponse, isEdi
 
     const formattedSale = formatSaleForClient(newSaleResult[0]);
 
-    return res.status(isEditing ? 200 : 201).json({ sale: formattedSale });
+    return res.status(201).json({ sale: formattedSale });
 
   } catch (error: any) {
-    console.error('Sale creation/update failed:', error);
+    console.error('Sale creation failed:', error);
     return res.status(500).json({ error: 'Falha na operação com o banco de dados.', details: error.message });
   }
 }

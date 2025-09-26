@@ -22,7 +22,7 @@ const sql = neon(process.env.DATABASE_URL);
 export async function query(queryText: string, params: any[] = []) {
   try {
     const start = Date.now();
-    // Fix: Pass the params array directly. The `sql` function expects an array of parameters as the second argument.
+    // Fix: The `sql` function from `@neondatabase/serverless` expects parameters as a single array, not spread.
     const result = await sql(queryText, params);
     const duration = Date.now() - start;
     // Basic logging for monitoring query performance.
