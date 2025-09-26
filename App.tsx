@@ -1,10 +1,14 @@
-// FIX: Manually define types for Vite's `import.meta.env` as the original `/// <reference types="vite/client" />` directive was failing to resolve. This fixes both the type definition error and the error for accessing `import.meta.env`.
+
+// Fix: Add a reference to Vite's client types to make `import.meta.env` available.
+/// <reference types="vite/client" />
+
+// Augment Vite's `ImportMetaEnv` interface to include the custom environment variable.
+// This ensures type safety when accessing `import.meta.env.VITE_APP_PASSWORD`
+// without conflicting with the base types provided by Vite.
 declare global {
-  interface ImportMeta {
-    readonly env: {
-      readonly VITE_APP_PASSWORD: string;
+    interface ImportMetaEnv {
+        readonly VITE_APP_PASSWORD: string;
     }
-  }
 }
 
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
