@@ -1,11 +1,15 @@
 
+
 // Fix: Add a reference to Vite's client types to make `import.meta.env` available.
 /// <reference types="vite/client" />
 
-// Augment Vite's `ImportMetaEnv` interface to include the custom environment variable.
-// This ensures type safety when accessing `import.meta.env.VITE_APP_PASSWORD`
-// without conflicting with the base types provided by Vite.
+// Since `vite/client` types might not be found in some environments,
+// we manually define `ImportMeta` and augment `ImportMetaEnv` to provide type safety
+// for `import.meta.env` and resolve TypeScript errors.
 declare global {
+    interface ImportMeta {
+        readonly env: ImportMetaEnv;
+    }
     interface ImportMetaEnv {
         readonly VITE_APP_PASSWORD: string;
     }
@@ -170,11 +174,14 @@ const App: React.FC = () => {
     if (!window.confirm("Tem certeza que deseja excluir esta venda?")) return;
     try {
         const response = await fetch(`/api/sales/${saleId}`, { method: 'DELETE' });
-        if (!response.ok) throw new Error('Failed to delete sale from server.');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.details || errorData.error || `Falha na comunicação com o servidor (Status: ${response.status}).`);
+        }
         setAllSales(prev => prev.filter(s => s.id !== saleId));
         setLightboxMessage({ type: 'success', text: 'Venda excluída com sucesso.' });
     } catch (error: any) {
-        setLightboxMessage({ type: 'error', text: 'Ocorreu um erro ao excluir a venda.' });
+        setLightboxMessage({ type: 'error', text: error.message || 'Ocorreu um erro ao excluir a venda.' });
     }
   };
 

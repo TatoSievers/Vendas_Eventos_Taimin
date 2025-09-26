@@ -10,19 +10,14 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
 
   if (req.method === 'DELETE') {
     try {
-      // The ON DELETE CASCADE on sale_products will handle deleting related items
-      const result = await query('DELETE FROM sales WHERE id = $1', [id]);
+      // Execute the delete operation. If the ID doesn't exist, this
+      // command will still succeed without error, which is acceptable
+      // for a DELETE request. The ON DELETE CASCADE directive in the
+      // 'sale_products' table will handle deleting related items.
+      await query('DELETE FROM sales WHERE id = $1', [id]);
       
-      if (result.length > 0) { // Neon/Vercel pg might return an empty array on success
-        return res.status(200).json({ message: 'Sale deleted successfully.' });
-      } else {
-         // Check if it existed
-         const check = await query('SELECT 1 FROM sales WHERE id = $1', [id]);
-         if (check.length === 0) {
-            return res.status(404).json({ error: 'Sale not found.' });
-         }
-         return res.status(200).json({ message: 'Sale deleted successfully.' });
-      }
+      // If the query completes without throwing an error, we can consider it successful.
+      return res.status(200).json({ message: 'Sale deleted successfully.' });
 
     } catch (error: any) {
       console.error(`Failed to delete sale ${id}:`, error);
