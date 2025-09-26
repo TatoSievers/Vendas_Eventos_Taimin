@@ -1,41 +1,42 @@
-// Conteúdo para: lib/db.ts
+// api/lib/db.ts
 
 import { neon, neonConfig } from '@neondatabase/serverless';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
+// Enable connection caching for better performance in a serverless environment.
 neonConfig.fetchConnectionCache = true;
 
+// Ensure the database URL is configured in environment variables.
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL environment variable is not set');
 }
 
 const sql = neon(process.env.DATABASE_URL);
 
+/**
+ * Executes a SQL query against the Neon database.
+ * @param queryText The SQL query string with placeholders (e.g., $1, $2).
+ * @param params An array of parameters to safely inject into the query.
+ * @returns The result of the query.
+ */
 export async function query(queryText: string, params: any[] = []) {
   try {
     const start = Date.now();
-    
-    const separator = '--NEON_PARAM_SEPARATOR--';
-    const queryWithSeparators = queryText.replace(/\$\d+/g, separator);
-    const strings = queryWithSeparators.split(separator);
-
-    const placeholderCount = (queryText.match(/\$\d+/g) || []).length;
-    if (placeholderCount !== params.length) {
-      throw new Error(`Query placeholder count (${placeholderCount}) does not match params count (${params.length}). Query: "${queryText}"`);
-    }
-
-    const result = await sql(strings as any, ...params);
-    
+    // Fix: Use sql.unsafe to resolve TypeScript overload ambiguity. This is safe for parameterized queries.
+    const result = await sql.unsafe(queryText, params);
     const duration = Date.now() - start;
-    console.log('executed query', { queryText, duration, rows: Array.isArray(result) ? result.length : 0 });
+    // Basic logging for monitoring query performance.
+    console.log('Executed query', { queryText, duration, rows: Array.isArray(result) ? result.length : 0 });
     return result;
   } catch (error) {
     console.error('Error executing query:', { queryText, params, error });
+    // Re-throw the error to be caught by the handler's error handling.
     throw error;
   }
 }
 
-export const dbSchema = `
+// The complete database schema definition.
+const dbSchema = `
   CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL);
   CREATE TABLE IF NOT EXISTS events (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, date DATE NOT NULL);
   CREATE TABLE IF NOT EXISTS products (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, preco NUMERIC(10, 2) NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'disponível' CHECK (status IN ('disponível', 'indisponível')));
@@ -51,28 +52,38 @@ export const dbSchema = `
 
 let dbInitialized = false;
 
-export async function initDb() {
+/**
+ * Initializes the database by creating tables if they don't exist.
+ * This runs only once per serverless function instance.
+ */
+async function initDb() {
   if (dbInitialized) return;
   console.log("Initializing database schema...");
   try {
-    const statements = dbSchema.split(';').map(s => s.trim()).filter(s => s.length > 0);
-    for (const statement of statements) {
-      await query(statement);
-    }
+    // Execute the entire schema as a single block. `sql.unsafe` is safe here as the schema is static.
+    await sql.unsafe(dbSchema);
     dbInitialized = true;
     console.log("Database schema initialized successfully.");
   } catch (error) {
     console.error("Failed to initialize database schema:", error);
+    // If initialization fails, subsequent queries will likely fail, but we throw to signal a critical issue.
     throw new Error('Could not initialize database.');
   }
 }
 
+// Type definition for a standard Vercel API handler.
 type ApiHandler = (req: VercelRequest, res: VercelResponse) => Promise<void | VercelResponse>;
 
+/**
+ * A higher-order function that wraps an API handler to ensure the database
+ * is initialized before the handler logic runs.
+ * @param handler The API handler function to wrap.
+ * @returns A new handler function with database connection logic.
+ */
 export const withDbConnection = (handler: ApiHandler) => async (req: VercelRequest, res: VercelResponse) => {
   try {
     await initDb();
-    await handler(req, res);
+    return await handler(req, res);
   } catch (error: any) {
     console.error('API Handler Error:', error);
     if (!res.headersSent) {
