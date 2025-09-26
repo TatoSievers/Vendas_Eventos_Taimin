@@ -1,7 +1,7 @@
+/// <reference types="vite/client" />
 // Fix: The triple-slash directive must be at the absolute top of the file.
 // This ensures that Vite's client-side type definitions are loaded correctly,
 // resolving errors related to `import.meta.env`.
-/// <reference types="vite/client" />
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import SalesForm from './components/SalesForm';
 import InitialSetupForm from './components/InitialSetupForm';
@@ -89,21 +89,29 @@ const App: React.FC = () => {
 
   const handleCreateUser = async (name: string) => {
       if (appUsers.some(u => u.name.trim().toLowerCase() === name.trim().toLowerCase())) return;
-      await fetch('/api/setup', {
+      const response = await fetch('/api/setup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: 'user', name }),
       });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Falha ao criar o usuário no servidor.');
+      }
       setAppUsers(prev => [...prev, { name }].sort((a,b) => a.name.localeCompare(b.name)));
   };
 
   const handleCreateEvent = async (name: string, date: string) => {
       if (appEvents.some(e => e.name.trim().toLowerCase() === name.trim().toLowerCase())) return;
-      await fetch('/api/setup', {
+      const response = await fetch('/api/setup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: 'event', name, date }),
       });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Falha ao criar o evento no servidor.');
+      }
       setAppEvents(prev => [...prev, { name, date }].sort((a,b) => a.name.localeCompare(b.name)));
   };
 
