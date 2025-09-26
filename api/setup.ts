@@ -2,7 +2,15 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { withDbConnection, query } from './lib/db.js';
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    return res.status(204).end();
+  }
+
   if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST', 'OPTIONS']);
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 

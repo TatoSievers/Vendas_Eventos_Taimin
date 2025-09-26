@@ -2,7 +2,15 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { withDbConnection, query } from '../lib/db.js';
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    return res.status(204).end();
+  }
+
   if (req.method !== 'DELETE') {
+    res.setHeader('Allow', ['DELETE', 'OPTIONS']);
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
@@ -17,14 +25,9 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
   try {
     // ON DELETE CASCADE on the 'sales' table's event_id foreign key
     // will automatically delete all associated sales.
-    const result = await query('DELETE FROM events WHERE name = $1', [eventName]);
+    await query('DELETE FROM events WHERE name = $1', [eventName]);
     
-    // Check if any row was actually deleted
-    if (result.length > 0 || true) { // Some drivers might return empty on success
-      return res.status(200).json({ message: `Event '${eventName}' and all its sales have been deleted.` });
-    } else {
-      return res.status(404).json({ error: `Event '${eventName}' not found.` });
-    }
+    return res.status(200).json({ message: `Event '${eventName}' and all its sales have been deleted.` });
 
   } catch (error: any) {
     console.error(`Failed to delete event ${eventName}:`, error);

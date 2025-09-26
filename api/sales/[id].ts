@@ -5,7 +5,8 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
   // Handle preflight OPTIONS requests, which browsers send before certain
   // requests (including DELETE) to check for permissions.
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Methods', 'DELETE');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     return res.status(204).end();
   }
@@ -31,7 +32,7 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
     }
   } else {
     // If the method is not DELETE or OPTIONS, it's not allowed.
-    res.setHeader('Allow', 'DELETE, OPTIONS');
+    res.setHeader('Allow', ['DELETE', 'OPTIONS']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 };

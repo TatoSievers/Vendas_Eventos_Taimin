@@ -27,11 +27,19 @@ const formatSaleForClient = (sale: any) => {
 };
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, PUT, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    return res.status(204).end();
+  }
+
   if (req.method === 'POST') {
     return createOrUpdateSale(req, res);
   } else if (req.method === 'PUT') {
     return createOrUpdateSale(req, res, true);
   } else {
+    res.setHeader('Allow', ['POST', 'PUT', 'OPTIONS']);
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 };
