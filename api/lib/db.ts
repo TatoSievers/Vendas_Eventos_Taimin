@@ -110,7 +110,7 @@ export async function initDb() {
     for (const statement of statements) {
       await query(statement);
     }
-    
+
     dbInitialized = true;
     console.log("Database schema initialized successfully.");
   } catch (error) {

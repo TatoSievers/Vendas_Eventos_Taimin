@@ -128,28 +128,6 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
     }
   };
 
-  const handleCPFBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
-    const cpf = e.target.value;
-
-    if (!validateCPF(cpf)) return;
-    if (isEditing) return; 
-    
-    if (cpf) {
-        try {
-            const response = await fetch(`/api/customers/${encodeURIComponent(cpf)}`);
-            if (response.ok) {
-                const customerData = await response.json();
-                setFormData(prev => ({ ...prev, ...customerData }));
-                onNotify({ type: 'info', text: "Dados do cliente preenchidos com base no CPF." });
-            } else if (response.status !== 404) {
-                 onNotify({ type: 'error', text: "Erro ao buscar dados do cliente." });
-            }
-        } catch (error) {
-            onNotify({ type: 'error', text: "Falha na comunicação com o servidor ao buscar CPF." });
-        }
-    }
-  };
-
   const handleCEPBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
     const cep = e.target.value.replace(/\D/g, '');
     if (cep.length === 8) {
@@ -293,7 +271,7 @@ const SalesForm: React.FC<SalesFormPropsType> = ({
           <InputField label="Primeiro Nome" id="primeiroNome" name="primeiroNome" value={formData.primeiroNome} onChange={handleChange} required Icon={UserIcon}/>
           <InputField label="Sobrenome" id="sobrenome" name="sobrenome" value={formData.sobrenome} onChange={handleChange} required Icon={UserIcon}/>
         </div>
-        <InputField label="CPF" id="cpf" name="cpf" value={formData.cpf} onChange={handleChange} onBlur={handleCPFBlur} required Icon={IdCardIcon} readOnly={isEditing} maxLength={14} />
+        <InputField label="CPF" id="cpf" name="cpf" value={formData.cpf} onChange={handleChange} required Icon={IdCardIcon} readOnly={isEditing} maxLength={14} />
         <InputField label="E-mail" id="email" name="email" type="email" value={formData.email} onChange={handleChange} required Icon={EmailIcon}/>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6">
           <InputField label="DDD" id="ddd" name="ddd" value={formData.ddd} onChange={handleChange} onBlur={handleDddBlur} required Icon={PhoneIcon} maxLength={2} pattern="\d{2}"/>
