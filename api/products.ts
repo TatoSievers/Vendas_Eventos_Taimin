@@ -4,13 +4,8 @@ import { ProdutoInfo } from '../types';
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
   try {
+    // CORS is now handled by vercel.json, so the OPTIONS case is removed.
     switch (req.method) {
-      case 'OPTIONS':
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'POST, PUT, DELETE, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-        return res.status(204).end();
-        
       case 'POST': // Create
         const newProduct: ProdutoInfo = req.body.product;
         if (!newProduct || !newProduct.name || newProduct.preco == null || !newProduct.status) {
@@ -48,7 +43,7 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
         return res.status(200).json({ message: 'Product deleted successfully.' });
 
       default:
-        res.setHeader('Allow', ['POST', 'PUT', 'DELETE', 'OPTIONS']);
+        res.setHeader('Allow', ['POST', 'PUT', 'DELETE']);
         return res.status(405).end(`Method ${req.method} Not Allowed`);
     }
   } catch (error: any) {

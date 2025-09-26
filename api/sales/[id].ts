@@ -2,13 +2,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { withDbConnection, query } from '../lib/db.js';
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
-  // Handle preflight OPTIONS requests for CORS
-  if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    return res.status(204).end();
-  }
+  // CORS is now handled by vercel.json, so the OPTIONS handler is removed.
   
   if (req.method === 'DELETE') {
     const { id } = req.query;
@@ -28,7 +22,7 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
   }
 
   // If the method is not handled above, it is not allowed.
-  res.setHeader('Allow', ['DELETE', 'OPTIONS']);
+  res.setHeader('Allow', ['DELETE']);
   return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 };
 
