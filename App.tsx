@@ -1,4 +1,4 @@
-// FIX: The triple-slash directive `/// <reference types="vite/client" />` must be at the absolute top of the file to be correctly processed by TypeScript. It was previously preceded by comments, which caused Vite's client types not to be loaded, leading to errors with `import.meta.env`.
+// FIX: The triple-slash directive `/// <reference types="vite/client" />` must be at the absolute top of the file to be correctly processed by TypeScript. It was previously on line 2, which caused Vite's client types not to be loaded.
 /// <reference types="vite/client" />
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import SalesForm from './components/SalesForm';
@@ -86,31 +86,44 @@ const App: React.FC = () => {
   };
 
   const handleCreateUser = async (name: string) => {
-      if (appUsers.some(u => u.name.trim().toLowerCase() === name.trim().toLowerCase())) return;
-      const response = await fetch('/api/setup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'user', name }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Falha ao criar o usuário no servidor.');
-      }
-      setAppUsers(prev => [...prev, { name }].sort((a,b) => a.name.localeCompare(b.name)));
+    const response = await fetch('/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'user', name }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const detail = errorData.details ? ` (${errorData.details})` : '';
+      throw new Error((errorData.error || 'Falha ao criar o usuário no servidor.') + detail);
+    }
+    
+    const { user: createdUser } = await response.json();
+    // Only update state if a new user was actually created by the database.
+    // This prevents duplicates in the UI if the user already existed.
+    if (createdUser && !appUsers.some(u => u.name === createdUser.name)) {
+      setAppUsers(prev => [...prev, { name: createdUser.name }].sort((a,b) => a.name.localeCompare(b.name)));
+    }
   };
 
   const handleCreateEvent = async (name: string, date: string) => {
-      if (appEvents.some(e => e.name.trim().toLowerCase() === name.trim().toLowerCase())) return;
-      const response = await fetch('/api/setup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'event', name, date }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Falha ao criar o evento no servidor.');
-      }
-      setAppEvents(prev => [...prev, { name, date }].sort((a,b) => a.name.localeCompare(b.name)));
+    const response = await fetch('/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'event', name, date }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const detail = errorData.details ? ` (${errorData.details})` : '';
+      throw new Error((errorData.error || 'Falha ao criar o evento no servidor.') + detail);
+    }
+    
+    const { event: createdEvent } = await response.json();
+    // Only update state if a new event was actually created by the database.
+    if (createdEvent && !appEvents.some(e => e.name === createdEvent.name)) {
+       setAppEvents(prev => [...prev, { name: createdEvent.name, date: createdEvent.date }].sort((a,b) => a.name.localeCompare(b.name)));
+    }
   };
 
   const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
@@ -175,7 +188,7 @@ const App: React.FC = () => {
     const response = await fetch('/api/products', {
         method: isEditing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product, originalName })
+        body: JSON.stringify({ product: { ...product, name: product.name.trim() }, originalName })
     });
 
     if (!response.ok) {
@@ -183,10 +196,12 @@ const App: React.FC = () => {
         throw new Error(error || 'Failed to save product.');
     }
     
+    const savedProduct = await response.json();
+
     setAppProducts(prev => {
         const updated = isEditing
-            ? prev.map(p => p.name === originalName ? product : p)
-            : [...prev, product];
+            ? prev.map(p => p.name === originalName ? savedProduct : p)
+            : [...prev, savedProduct];
         return updated.sort((a, b) => a.name.localeCompare(b.name));
     });
   };
