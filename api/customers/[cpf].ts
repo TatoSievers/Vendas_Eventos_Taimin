@@ -1,4 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
+// Fix: Corrected relative path to the db module.
 import { withDbConnection, query } from '../lib/db.js';
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {

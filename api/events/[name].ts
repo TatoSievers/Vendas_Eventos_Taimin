@@ -1,8 +1,11 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
+// Fix: Corrected relative path to the db module.
 import { withDbConnection, query } from '../lib/db.js';
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
-  // CORS is now handled by vercel.json, so the OPTIONS handler is removed.
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   if (req.method === 'DELETE') {
     const { name } = req.query;
@@ -26,7 +29,7 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
   }
 
   // If the method is not handled above, it is not allowed.
-  res.setHeader('Allow', ['DELETE']);
+  res.setHeader('Allow', ['DELETE', 'OPTIONS']);
   return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 };
 

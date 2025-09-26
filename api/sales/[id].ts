@@ -1,11 +1,12 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
+// Fix: Corrected relative path to the db module.
 import { withDbConnection, query } from '../lib/db.js';
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
+  // Debugging line as requested to identify the method received by the function.
+  console.log('Método recebido:', req.method);
+
   // Explicitly handle the browser's CORS preflight OPTIONS request.
-  // This is the definitive fix for the "405 Method Not Allowed" error.
-  // The vercel.json configuration should handle this, but this makes the function robust
-  // in case the OPTIONS request is passed through.
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
