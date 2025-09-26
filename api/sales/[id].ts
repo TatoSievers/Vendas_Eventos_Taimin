@@ -1,8 +1,14 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { withDbConnection, query } from '../lib/db.js';
+import { withDbConnection, query } from './lib/db.js';
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
-  // CORS is now handled by vercel.json, so the OPTIONS handler is removed.
+  // Explicitly handle the browser's CORS preflight OPTIONS request.
+  // This is the definitive fix for the "405 Method Not Allowed" error.
+  // The vercel.json configuration should handle this, but this makes the function robust
+  // in case the OPTIONS request is passed through.
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
   
   if (req.method === 'DELETE') {
     const { id } = req.query;
@@ -22,7 +28,7 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
   }
 
   // If the method is not handled above, it is not allowed.
-  res.setHeader('Allow', ['DELETE']);
+  res.setHeader('Allow', ['DELETE', 'OPTIONS']);
   return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 };
 
