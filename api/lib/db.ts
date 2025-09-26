@@ -1,18 +1,16 @@
+// Conteúdo para: lib/db.ts
+
 import { neon, neonConfig } from '@neondatabase/serverless';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Configuração necessária para o driver do Neon na Vercel.
 neonConfig.fetchConnectionCache = true;
 
-// Validação da variável de ambiente do banco de dados.
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL environment variable is not set');
 }
 
-// Inicializa a conexão com o banco de dados.
 const sql = neon(process.env.DATABASE_URL);
 
-// Função utilitária para executar queries no formato pg-style ($1, $2).
 export async function query(queryText: string, params: any[] = []) {
   try {
     const start = Date.now();
@@ -37,7 +35,6 @@ export async function query(queryText: string, params: any[] = []) {
   }
 }
 
-// Definição do schema do banco de dados.
 export const dbSchema = `
   CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL);
   CREATE TABLE IF NOT EXISTS events (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, date DATE NOT NULL);
@@ -54,7 +51,6 @@ export const dbSchema = `
 
 let dbInitialized = false;
 
-// Função que inicializa o schema do banco.
 export async function initDb() {
   if (dbInitialized) return;
   console.log("Initializing database schema...");
@@ -71,11 +67,8 @@ export async function initDb() {
   }
 }
 
-// --- CÓDIGO ALTERADO PARA EVITAR ERRO DE SINTAXE ---
-// Primeiro, definimos um 'type' para nossas funções de API. Isso simplifica o código.
 type ApiHandler = (req: VercelRequest, res: VercelResponse) => Promise<void | VercelResponse>;
 
-// Agora, usamos esse 'type' na função 'withDbConnection', tornando-a mais limpa e menos propensa a erros.
 export const withDbConnection = (handler: ApiHandler) => async (req: VercelRequest, res: VercelResponse) => {
   try {
     await initDb();
