@@ -1,7 +1,9 @@
-/// <reference types="vite/client" />
+// FIX: The triple-slash directive must be at the top of the file, but can be preceded by comments.
+// Swapping the order of the comment and the directive to ensure it is processed correctly by the compiler.
 // Fix: The triple-slash directive must be at the absolute top of the file.
 // This ensures that Vite's client-side type definitions are loaded correctly,
 // resolving errors related to `import.meta.env`.
+/// <reference types="vite/client" />
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import SalesForm from './components/SalesForm';
 import InitialSetupForm from './components/InitialSetupForm';
@@ -118,22 +120,28 @@ const App: React.FC = () => {
   const handleSaveSale = async (saleData: SalesData, isEditing: boolean) => {
     try {
       const response = await fetch('/api/sales', {
-          method: isEditing ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(saleData)
+        method: isEditing ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(saleData)
       });
-      if (!response.ok) throw new Error(await response.text());
+  
+      if (!response.ok) {
+        // Attempt to parse a JSON error from the backend for a more specific message
+        const errorData = await response.json().catch(() => ({})); // Gracefully handle non-JSON responses
+        throw new Error(errorData.details || errorData.error || `Falha na comunicação com o servidor (Status: ${response.status}).`);
+      }
+  
       const { sale: savedSale } = await response.json();
       
       if (isEditing) {
-          setAllSales(prev => prev.map(s => s.id === savedSale.id ? savedSale : s));
-          setLightboxMessage({ type: 'success', text: 'Venda atualizada com sucesso!' });
+        setAllSales(prev => prev.map(s => s.id === savedSale.id ? savedSale : s));
+        setLightboxMessage({ type: 'success', text: 'Venda atualizada com sucesso!' });
       } else {
-          setAllSales(prev => [savedSale, ...prev]);
-          setLightboxMessage({ type: 'success', text: 'Venda registrada com sucesso!' });
+        setAllSales(prev => [savedSale, ...prev]);
+        setLightboxMessage({ type: 'success', text: 'Venda registrada com sucesso!' });
       }
     } catch (error: any) {
-        setLightboxMessage({ type: 'error', text: 'Ocorreu um erro ao salvar a venda.' });
+      setLightboxMessage({ type: 'error', text: error.message || 'Ocorreu um erro ao salvar a venda.' });
     }
     setEditingSaleId(null);
   };
