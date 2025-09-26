@@ -1,27 +1,22 @@
 import { neon, neonConfig } from '@neondatabase/serverless';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
-// CORRETO: Configuração necessária para o driver do Neon na Vercel.
+// Configuração necessária para o driver do Neon na Vercel.
 neonConfig.fetchConnectionCache = true;
 
-// CORRETO: Validação para garantir que a variável de ambiente do banco de dados existe.
+// Validação da variável de ambiente do banco de dados.
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL environment variable is not set');
 }
 
-// CORRETO: Inicializa a conexão com o banco de dados.
+// Inicializa a conexão com o banco de dados.
 const sql = neon(process.env.DATABASE_URL);
 
-/**
- * CORRETO: Função utilitária para executar queries.
- * A lógica interna converte queries no estilo 'pg' (com $1, $2) para o formato
- * que o driver serverless do Neon espera.
- */
+// Função utilitária para executar queries no formato pg-style ($1, $2).
 export async function query(queryText: string, params: any[] = []) {
   try {
     const start = Date.now();
     
-    // Transforma placeholders $1, $2, etc., para o formato de template literal
     const separator = '--NEON_PARAM_SEPARATOR--';
     const queryWithSeparators = queryText.replace(/\$\d+/g, separator);
     const strings = queryWithSeparators.split(separator);
@@ -42,7 +37,7 @@ export async function query(queryText: string, params: any[] = []) {
   }
 }
 
-// CORRETO: Mantém a definição do schema do banco de dados em uma variável.
+// Definição do schema do banco de dados.
 export const dbSchema = `
   CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL);
   CREATE TABLE IF NOT EXISTS events (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, date DATE NOT NULL);
@@ -59,12 +54,36 @@ export const dbSchema = `
 
 let dbInitialized = false;
 
-/**
- * CORRETO: Função que inicializa o schema do banco, executando uma query por vez,
- * pois o driver serverless não suporta múltiplas declarações em uma única chamada.
- */
+// Função que inicializa o schema do banco.
 export async function initDb() {
   if (dbInitialized) return;
   console.log("Initializing database schema...");
   try {
-    const statements = dbSchema.split(';').map(s => s.trim()).filter(s => s.length > 0
+    const statements = dbSchema.split(';').map(s => s.trim()).filter(s => s.length > 0);
+    for (const statement of statements) {
+      await query(statement);
+    }
+    dbInitialized = true;
+    console.log("Database schema initialized successfully.");
+  } catch (error) {
+    console.error("Failed to initialize database schema:", error);
+    throw new Error('Could not initialize database.');
+  }
+}
+
+// --- CÓDIGO ALTERADO PARA EVITAR ERRO DE SINTAXE ---
+// Primeiro, definimos um 'type' para nossas funções de API. Isso simplifica o código.
+type ApiHandler = (req: VercelRequest, res: VercelResponse) => Promise<void | VercelResponse>;
+
+// Agora, usamos esse 'type' na função 'withDbConnection', tornando-a mais limpa e menos propensa a erros.
+export const withDbConnection = (handler: ApiHandler) => async (req: VercelRequest, res: VercelResponse) => {
+  try {
+    await initDb();
+    await handler(req, res);
+  } catch (error: any) {
+    console.error('API Handler Error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'An internal server error occurred.' });
+    }
+  }
+};
