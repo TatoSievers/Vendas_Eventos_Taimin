@@ -15,10 +15,24 @@ const sql = neon(process.env.DATABASE_URL);
 export async function query(queryText: string, params: any[] = []) {
   try {
     const start = Date.now();
-    // Fix: The `sql` function from `@neondatabase/serverless` is a tagged template literal.
-    // To call it with a dynamic query string and parameters, we must adapt the call to match
-    // the tagged template syntax: `tag([string], ...values)`.
-    const result = await sql([queryText] as any, ...params);
+    
+    // The `sql` function from `@neondatabase/serverless` is a tagged template literal.
+    // It does not process positional placeholders like $1, $2. To make it work with 
+    // pg-style queries, we transform the query string and parameters into the format 
+    // expected by a tagged template call: sql`...${param1}...` which is equivalent to 
+    // sql(['...', '...'], param1).
+    const separator = '--NEON_PARAM_SEPARATOR--';
+    const queryWithSeparators = queryText.replace(/\$\d+/g, separator);
+    const strings = queryWithSeparators.split(separator);
+
+    // Validate that the number of placeholders found matches the number of parameters passed.
+    const placeholderCount = (queryText.match(/\$\d+/g) || []).length;
+    if (placeholderCount !== params.length) {
+      throw new Error(`Query placeholder count (${placeholderCount}) does not match params count (${params.length}). Query: "${queryText}"`);
+    }
+
+    const result = await sql(strings as any, ...params);
+    
     const duration = Date.now() - start;
     console.log('executed query', { queryText, duration, rows: Array.isArray(result) ? result.length : 0 });
     return result;

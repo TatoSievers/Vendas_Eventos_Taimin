@@ -1,4 +1,4 @@
-// FIX: The triple-slash directive `/// <reference types="vite/client" />` must be at the absolute top of the file to be correctly processed by TypeScript. It was previously on line 2, which caused Vite's client types not to be loaded.
+// FIX: Moved the triple-slash directive to the top of the file. It must be the very first thing in the file for TypeScript to recognize Vite's client types and correctly type `import.meta.env`.
 /// <reference types="vite/client" />
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import SalesForm from './components/SalesForm';
