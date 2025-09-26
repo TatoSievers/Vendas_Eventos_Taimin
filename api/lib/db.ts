@@ -22,9 +22,9 @@ const sql = neon(process.env.DATABASE_URL);
 export async function query(queryText: string, params: any[] = []) {
   try {
     const start = Date.now();
-    // Fix: Spreading the `params` array helps TypeScript correctly resolve the `sql` function's overloads,
-    // distinguishing between the tagged template literal and the dynamic query signature.
-    const result = await sql(queryText, ...params);
+    // Fix: Pass `params` as a single array to match the `sql(query, params)` function signature.
+    // Spreading `params` (...params) causes a type error because it matches the tagged template literal overload `sql(template, ...values)`.
+    const result = await sql(queryText, params);
     const duration = Date.now() - start;
     // Basic logging for monitoring query performance.
     console.log('Executed query', { queryText, duration, rows: Array.isArray(result) ? result.length : 0 });
