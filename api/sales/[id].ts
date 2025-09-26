@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { withDbConnection, query } from './lib/db.js';
+import { withDbConnection, query } from '../lib/db.js';
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
   // Explicitly handle the browser's CORS preflight OPTIONS request.
