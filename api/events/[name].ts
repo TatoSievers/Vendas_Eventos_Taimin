@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { withDbConnection, query } from '../../lib/db';
+import { withDbConnection, query } from '../lib/db';
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
   if (req.method !== 'DELETE') {
