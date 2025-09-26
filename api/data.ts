@@ -1,6 +1,20 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { withDbConnection, query } from './lib/db.js';
 
+// Helper function to format date to YYYY-MM-DD, handling potential nulls/invalid dates.
+// It uses UTC functions to avoid timezone-related date shifts.
+const formatDateToYYYYMMDD = (dateInput: string | Date | null): string => {
+  if (!dateInput) return ''; 
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return ''; // Return empty for invalid dates
+  
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+
 const handler = async (req: VercelRequest, res: VercelResponse) => {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -39,11 +53,18 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
     
     // Vercel/Neon returns rows in a flat structure, we need to map them
     const appUsers = usersResult.map((r: any) => ({ name: r.name }));
-    const appEvents = eventsResult.map((r: any) => ({ name: r.name, date: r.date }));
+    const appEvents = eventsResult.map((r: any) => ({ 
+        name: r.name, 
+        date: formatDateToYYYYMMDD(r.date) 
+    }));
     const appProducts = productsResult.map((r: any) => ({ name: r.name, preco: parseFloat(r.preco), status: r.status }));
     
-    // Ensure produtos is an array, even if null from DB
-    const allSales = salesResult.map((r: any) => ({...r, produtos: r.produtos || [] }));
+    // Ensure produtos is an array and dataEvento is correctly formatted
+    const allSales = salesResult.map((r: any) => ({
+        ...r, 
+        dataEvento: formatDateToYYYYMMDD(r.dataEvento),
+        produtos: r.produtos || [] 
+    }));
 
 
     return res.status(200).json({
