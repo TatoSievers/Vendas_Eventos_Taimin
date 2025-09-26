@@ -22,8 +22,8 @@ const sql = neon(process.env.DATABASE_URL);
 export async function query(queryText: string, params: any[] = []) {
   try {
     const start = Date.now();
-    // Fix: Use sql.unsafe to resolve TypeScript overload ambiguity. This is safe for parameterized queries.
-    const result = await sql.unsafe(queryText, params);
+    // Fix: Spread the params array as the `sql` function expects individual arguments.
+    const result = await sql(queryText, ...params);
     const duration = Date.now() - start;
     // Basic logging for monitoring query performance.
     console.log('Executed query', { queryText, duration, rows: Array.isArray(result) ? result.length : 0 });
@@ -60,8 +60,17 @@ async function initDb() {
   if (dbInitialized) return;
   console.log("Initializing database schema...");
   try {
-    // Execute the entire schema as a single block. `sql.unsafe` is safe here as the schema is static.
-    await sql.unsafe(dbSchema);
+    // Split the schema string into individual, non-empty commands.
+    const commands = dbSchema
+      .split(';')
+      .map(cmd => cmd.trim())
+      .filter(cmd => cmd.length > 0);
+
+    // Execute each command sequentially.
+    for (const command of commands) {
+      await query(command);
+    }
+    
     dbInitialized = true;
     console.log("Database schema initialized successfully.");
   } catch (error) {
