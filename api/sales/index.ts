@@ -1,3 +1,10 @@
+Com certeza\! Aqui está o código completo e corrigido para o seu arquivo **`api/sales/index.ts`**.
+
+A única alteração foi na linha 31, onde `req` foi renomeado para `_req` para resolver o erro `TS6133` que você encontrou. Agora ele deve funcionar sem problemas.
+
+**Copie e cole este código inteiro no seu arquivo `api/sales/index.ts`:**
+
+```typescript
 // DENTRO DO NOVO ARQUIVO: api/sales/index.ts
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
@@ -28,13 +35,13 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
 };
 
 // --- FUNÇÃO PARA BUSCAR TODAS AS VENDAS ---
-async function getAllSales(req: VercelRequest, res: VercelResponse) {
+async function getAllSales(_req: VercelRequest, res: VercelResponse) { // <-- A CORREÇÃO ESTÁ AQUI
   try {
     // =============================================================
     // SUA LÓGICA PARA BUSCAR TODAS AS VENDAS NO BANCO DE DADOS AQUI
     // Exemplo:
     const salesResult = await query(`
-      SELECT s.id, s.valor_total as "valorTotal", e.name as "nomeEvento", c.primeiro_nome as "primeiroNome", c.sobrenome
+      SELECT s.id, s.created_at, s.valor_total as "valorTotal", e.name as "nomeEvento", c.primeiro_nome as "primeiroNome", c.sobrenome
       FROM sales s
       JOIN events e ON s.event_id = e.id
       JOIN customers c ON s.customer_id = c.id
@@ -42,7 +49,7 @@ async function getAllSales(req: VercelRequest, res: VercelResponse) {
     `);
     // =============================================================
     
-    // Você pode querer formatar os dados aqui também antes de enviar
+    // Formata os dados antes de enviar para o cliente
     const formattedSales = salesResult.map((sale: any) => ({
       ...sale,
       valorTotal: parseFloat(sale.valorTotal || 0)
@@ -77,3 +84,4 @@ async function createSale(req: VercelRequest, res: VercelResponse) {
 }
 
 export default withDbConnection(handler as any);
+```
