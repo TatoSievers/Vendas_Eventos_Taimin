@@ -2,31 +2,42 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { query } from './lib/db.js';
 
-const dbSchema = `
-  CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL);
-  CREATE TABLE IF NOT EXISTS events (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, date DATE NOT NULL);
-  CREATE TABLE IF NOT EXISTS products (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, preco NUMERIC(10, 2) NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'disponível' CHECK (status IN ('disponível', 'indisponível')));
-  CREATE TABLE IF NOT EXISTS customers (id SERIAL PRIMARY KEY, cpf TEXT UNIQUE NOT NULL, primeiro_nome TEXT NOT NULL, sobrenome TEXT NOT NULL, email TEXT, ddd TEXT, telefone_numero TEXT, cep TEXT, logradouro_rua TEXT, numero_endereco TEXT, complemento TEXT, bairro TEXT, cidade TEXT, estado TEXT);
-  CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-  CREATE TABLE IF NOT EXISTS sales (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), created_at TIMESTAMPTZ DEFAULT now(), user_id INT REFERENCES users(id) ON DELETE SET NULL, event_id INT REFERENCES events(id) ON DELETE CASCADE, customer_id INT REFERENCES customers(id) ON DELETE RESTRICT, forma_pagamento TEXT NOT NULL, valor_total NUMERIC(10, 2) NOT NULL, observacao TEXT);
-  CREATE TABLE IF NOT EXISTS sale_products (id SERIAL PRIMARY KEY, sale_id UUID REFERENCES sales(id) ON DELETE CASCADE NOT NULL, product_id INT REFERENCES products(id) ON DELETE RESTRICT, unidades INT NOT NULL, preco_unitario NUMERIC(10, 2) NOT NULL);
-  CREATE INDEX IF NOT EXISTS idx_sales_event_id ON sales(event_id);
-  CREATE INDEX IF NOT EXISTS idx_sales_user_id ON sales(user_id);
-  CREATE INDEX IF NOT EXISTS idx_sale_products_sale_id ON sale_products(sale_id);
-  CREATE INDEX IF NOT EXISTS idx_customers_cpf ON customers(cpf);
-`;
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    if (req.method === 'GET') {
-      const commands = dbSchema.split(';').map(cmd => cmd.trim()).filter(cmd => cmd.length > 0);
-      for (const command of commands) {
-        await query(command);
+    // A requisição POST é usada para criar novos usuários ou eventos
+    if (req.method === 'POST') {
+      const { type, name, date } = req.body;
+
+      // Se for para criar um usuário
+      if (type === 'user') {
+        if (!name) return res.status(400).json({ error: 'User name is required.' });
+        // Usamos ON CONFLICT para não dar erro se o usuário já existir
+        const result = await query(
+          'INSERT INTO users (name) VALUES ($1) ON CONFLICT (name) DO NOTHING RETURNING *',
+          [name]
+        );
+        // Retorna o usuário criado ou um objeto vazio se ele já existia
+        return res.status(201).json({ user: result[0] || { name } });
       }
-      return res.status(200).json({ message: 'Database schema setup successful.' });
+
+      // Se for para criar um evento
+      if (type === 'event') {
+        if (!name || !date) return res.status(400).json({ error: 'Event name and date are required.' });
+        // Usamos ON CONFLICT para não dar erro se o evento já existir
+        const result = await query(
+          'INSERT INTO events (name, date) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING RETURNING *',
+          [name, date]
+        );
+        // Retorna o evento criado ou um objeto vazio se ele já existia
+        return res.status(201).json({ event: result[0] || { name, date } });
+      }
+
+      // Se o 'type' for inválido
+      return res.status(400).json({ error: 'Invalid setup type.' });
     }
-    
-    res.setHeader('Allow', ['GET']);
+
+    // Se o método não for POST, não é permitido
+    res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 
   } catch (error: any) {
