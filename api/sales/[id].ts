@@ -106,10 +106,13 @@ async function getSaleById(id: string, res: VercelResponse) {
     return res.status(200).json(saleResult[0]);
 }
 
+// ### A CORREÇÃO ESTÁ AQUI ###
 async function updateSale(id: string, req: VercelRequest, res: VercelResponse) {
-    const saleData: SalesData = req.body;
+    // const saleData: SalesData = req.body; // Comentado para evitar o erro
+    console.log(`Recebida requisição para atualizar a venda com ID: ${id}`);
+    console.log('Dados recebidos:', req.body);
     // ... Implemente sua lógica de atualização aqui ...
-    return res.status(200).json({ message: "Venda atualizada com sucesso" });
+    return res.status(200).json({ message: "Lógica de atualização a ser implementada." });
 }
 
 async function deleteSale(id: string, res: VercelResponse) {
