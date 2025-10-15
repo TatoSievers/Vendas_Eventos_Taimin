@@ -1,37 +1,70 @@
 // DENTRO DE: api/sales/index.ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { query } from '../lib/db.js'; // Importa a nova função simplificada
+import { query } from '../lib/db.js';
 import { SalesData } from '../../types';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     switch (req.method) {
       case 'GET':
-        const salesResult = await query(`
-          SELECT s.id, s.created_at, s.valor_total as "valorTotal", e.name as "nomeEvento", c.primeiro_nome as "primeiroNome", c.sobrenome
-          FROM sales s
-          JOIN events e ON s.event_id = e.id
-          JOIN customers c ON s.customer_id = c.id
-          ORDER BY s.created_at DESC;
-        `);
-        const formattedSales = salesResult.map((sale: any) => ({
-          ...sale,
-          valorTotal: parseFloat(sale.valorTotal || 0)
-        }));
-        return res.status(200).json(formattedSales);
+        // A busca de todas as vendas já é feita em /api/data, mas mantemos para consistência
+        const salesResult = await query('SELECT * FROM sales ORDER BY created_at DESC');
+        return res.status(200).json(salesResult);
 
       case 'POST':
         const saleData: SalesData = req.body;
-        console.log('[api/sales/index] Sucesso! Dados recebidos para criar venda:', saleData);
-        // LÓGICA DO BANCO DE DADOS PARA CRIAR VENDA VAI AQUI
-        return res.status(201).json({ message: 'Venda criada com sucesso!', data: saleData });
+        
+        // Passo 1: Criar ou atualizar o cliente e obter o ID
+        const customerResult = await query(
+          `INSERT INTO customers (cpf, primeiro_nome, sobrenome, email, ddd, telefone_numero, cep, logradouro_rua, numero_endereco, complemento, bairro, cidade, estado)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           ON CONFLICT (cpf) DO UPDATE SET primeiro_nome = EXCLUDED.primeiro_nome, sobrenome = EXCLUDED.sobrenome, email = EXCLUDED.email, ddd = EXCLUDED.ddd, telefone_numero = EXCLUDED.telefone_numero, cep = EXCLUDED.cep, logradouro_rua = EXCLUDED.logradouro_rua, numero_endereco = EXCLUDED.numero_endereco, complemento = EXCLUDED.complemento, bairro = EXCLUDED.bairro, cidade = EXCLUDED.cidade, estado = EXCLUDED.estado
+           RETURNING id`,
+          [saleData.cpf, saleData.primeiroNome, saleData.sobrenome, saleData.email, saleData.ddd, saleData.telefoneNumero, saleData.cep, saleData.logradouroRua, saleData.numeroEndereco, saleData.complemento, saleData.bairro, saleData.cidade, saleData.estado]
+        );
+        const customerId = customerResult[0].id;
+
+        // Passo 2: Obter IDs do usuário e do evento
+        const userResult = await query('SELECT id FROM users WHERE name = $1', [saleData.nomeUsuario]);
+        const eventResult = await query('SELECT id FROM events WHERE name = $1', [saleData.nomeEvento]);
+        if (userResult.length === 0 || eventResult.length === 0) {
+          return res.status(400).json({ error: 'Usuário ou evento não encontrado.' });
+        }
+        const userId = userResult[0].id;
+        const eventId = eventResult[0].id;
+
+        // Passo 3: Inserir a venda
+        const saleResult = await query(
+          `INSERT INTO sales (user_id, event_id, customer_id, forma_pagamento, valor_total, observacao)
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`,
+          [userId, eventId, customerId, saleData.formaPagamento, saleData.valorTotal, saleData.observacao]
+        );
+        const { id: saleId, created_at: createdAt } = saleResult[0];
+
+        // Passo 4: Inserir os produtos da venda
+        const productNames = saleData.produtos.map(p => p.nomeProduto);
+        const productIdsResult = await query(`SELECT id, name FROM products WHERE name = ANY($1::text[])`, [productNames]);
+        const productIdMap = new Map(productIdsResult.map((p: any) => [p.name, p.id]));
+        
+        for (const product of saleData.produtos) {
+          const productId = productIdMap.get(product.nomeProduto);
+          if (!productId) throw new Error(`Produto '${product.nomeProduto}' não encontrado.`);
+          await query(
+            `INSERT INTO sale_products (sale_id, product_id, unidades, preco_unitario) VALUES ($1, $2, $3, $4)`,
+            [saleId, productId, product.unidades, product.preco_unitario]
+          );
+        }
+
+        // Passo 5: Retornar a venda completa para o frontend
+        const newCompleteSale = { ...saleData, id: saleId, created_at: createdAt };
+        return res.status(201).json({ sale: newCompleteSale });
 
       default:
         res.setHeader('Allow', ['GET', 'POST']);
         return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
     }
   } catch (error: any) {
-    console.error('ERRO CRÍTICO NO HANDLER:', error);
+    console.error('ERRO CRÍTICO NO HANDLER /api/sales:', error);
     return res.status(500).json({ error: 'Erro interno no servidor.', details: error.message });
   }
 }
