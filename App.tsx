@@ -1,5 +1,22 @@
+Você está absolutamente certo. O código que você enviou está **quase perfeito**. A causa da tela branca está escondida em um detalhe muito pequeno e comum em aplicações React.
 
+O erro `TypeError: i is not iterable` acontece porque sua API, em algum momento, está retornando "nada" (`undefined` ou `null`) em vez de uma "lista vazia" (`[]`) para uma das suas listas de dados (`allSales`, `appUsers`, etc.). Seu código do frontend não está preparado para essa possibilidade e quebra ao tentar processar "nada" como se fosse uma lista.
 
+-----
+
+### \#\# A Solução: Programação Defensiva 🛡️
+
+A correção é simples: vamos ensinar seu frontend a se proteger contra respostas inesperadas da API. Dentro da sua função `fetchInitialData`, vamos garantir que, se a API não enviar uma lista, seu aplicativo usará uma lista vazia por padrão.
+
+A mágica está em adicionar `|| []` (que significa "ou uma lista vazia") a cada linha que atualiza o estado.
+
+-----
+
+### \#\# Código Completo e Corrigido para `App.tsx`
+
+Apague **todo o conteúdo** do seu arquivo `App.tsx` e cole este código corrigido no lugar. As únicas alterações estão dentro da função `useEffect` que busca os dados iniciais.
+
+```typescript
 // Fix: Removed the reference to "vite/client" which was causing a "Cannot find type definition file" error.
 // The following manual global declarations for `ImportMetaEnv` are sufficient to provide type safety for `import.meta.env`.
 declare global {
@@ -52,10 +69,8 @@ const App: React.FC = () => {
   const [isProductManagerOpen, setIsProductManagerOpen] = useState<boolean>(false);
   const [isProductManagerPasswordPromptOpen, setIsProductManagerPasswordPromptOpen] = useState<boolean>(false);
   
-  // The application password must be set as an environment variable `VITE_APP_PASSWORD`.
   const appPassword = import.meta.env.VITE_APP_PASSWORD;
 
-  // Fetch initial data from the backend API
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
@@ -67,17 +82,21 @@ const App: React.FC = () => {
             const errorData = await response.json();
             throw new Error(errorData.error || `Failed to fetch data with status: ${response.status}`);
           } else {
-            // The error is not in JSON format, probably an HTML error page from the server/proxy
             const textError = await response.text();
-            console.error("Non-JSON error response:", textError); // Log for debugging
+            console.error("Non-JSON error response:", textError);
             throw new Error(textError || `A server error occurred: ${response.statusText}`);
           }
         }
         const data = await response.json();
-        setAppUsers(data.appUsers);
-        setAppEvents(data.appEvents);
-        setAppProducts(data.appProducts);
-        setAllSales(data.allSales);
+        
+        // ==========================================================
+        // A CORREÇÃO ESTÁ AQUI: Adicionamos '|| []' como um "plano B"
+        // ==========================================================
+        setAppUsers(data.appUsers || []);
+        setAppEvents(data.appEvents || []);
+        setAppProducts(data.appProducts || []);
+        setAllSales(data.allSales || []);
+        
       } catch (e: any) {
         setDbError(e.message);
       } finally {
@@ -110,8 +129,6 @@ const App: React.FC = () => {
     }
     
     const { user: createdUser } = await response.json();
-    // Only update state if a new user was actually created by the database.
-    // This prevents duplicates in the UI if the user already existed.
     if (createdUser && !appUsers.some(u => u.name === createdUser.name)) {
       setAppUsers(prev => [...prev, { name: createdUser.name }].sort((a,b) => a.name.localeCompare(b.name)));
     }
@@ -131,7 +148,6 @@ const App: React.FC = () => {
     }
     
     const { event: createdEvent } = await response.json();
-    // Only update state if a new event was actually created by the database.
     if (createdEvent && !appEvents.some(e => e.name === createdEvent.name)) {
        setAppEvents(prev => [...prev, { name: createdEvent.name, date: createdEvent.date }].sort((a,b) => a.name.localeCompare(b.name)));
     }
@@ -147,8 +163,7 @@ const App: React.FC = () => {
       });
   
       if (!response.ok) {
-        // Attempt to parse a JSON error from the backend for a more specific message
-        const errorData = await response.json().catch(() => ({})); // Gracefully handle non-JSON responses
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.details || errorData.error || `Falha na comunicação com o servidor (Status: ${response.status}).`);
       }
   
@@ -271,7 +286,7 @@ const App: React.FC = () => {
       const matchesEvent = filterEvent ? sale.nomeEvento === filterEvent : true;
       const matchesUser = filterUser ? sale.nomeUsuario === filterUser : true;
       return matchesSearch && matchesEvent && matchesUser;
-    }); // Sorting is now done server-side
+    });
   }, [allSales, searchTerm, filterEvent, filterUser]);
 
   const navigateToDashboard = () => setCurrentView('dashboard');
@@ -440,3 +455,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+```
