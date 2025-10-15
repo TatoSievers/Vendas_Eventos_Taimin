@@ -1,15 +1,52 @@
-Com certeza\! Aqui está o código completo e corrigido para o seu arquivo **`api/sales/index.ts`**.
+Não se preocupe\! Essa parede de erros parece assustadora, mas na verdade ela está apontando para **um único e simples problema**.
 
-A única alteração foi na linha 31, onde `req` foi renomeado para `_req` para resolver o erro `TS6133` que você encontrou. Agora ele deve funcionar sem problemas.
+O erro mais importante é o primeiro: `error TS1434: Unexpected keyword or identifier.` na **linha 1, coluna 1**.
 
-**Copie e cole este código inteiro no seu arquivo `api/sales/index.ts`:**
+-----
+
+### \#\# O Diagnóstico 🕵️‍♂️
+
+Quando um erro acontece logo no primeiro caractere do arquivo, quase sempre significa a mesma coisa: **um erro de copiar e colar**.
+
+Provavelmente, quando você copiou o código da minha resposta anterior, algum texto extra veio junto sem querer. Pode ter sido:
+
+  * A frase de introdução, como "Aqui está o código..."
+  * As marcações do bloco de código (\`\`\`typescript)
+  * Algum caractere invisível de formatação.
+
+O compilador tentou ler esse texto extra, não entendeu, e entrou em pânico, gerando todos os outros erros em cascata.
+
+-----
+
+### \#\# A Solução: Limpar e Colar Novamente ✅
+
+Vamos fazer o processo de novo, garantindo que o arquivo fique 100% limpo.
+
+#### **Passo 1: Apague Tudo**
+
+1.  Abra o seu arquivo **`api/sales/index.ts`**.
+2.  Selecione **todo** o conteúdo do arquivo (`Ctrl + A` no Windows ou `Cmd + A` no Mac).
+3.  **Delete** tudo. O arquivo deve ficar completamente vazio.
+
+#### **Passo 2: Copie o Código Corretamente**
+
+Abaixo está o mesmo código de antes, pronto para ser copiado. Certifique-se de copiar **apenas** o texto do código, começando com `import` e terminando com `as any);`.
+
+#### **Passo 3: Cole no Arquivo Vazio**
+
+Cole o código no seu arquivo `api/sales/index.ts`. Depois de colar, verifique se a **primeira linha** do arquivo é exatamente esta:
+`import { VercelRequest, VercelResponse } from '@vercel/node';`
+
+-----
+
+### \#\# Código Completo para Colar 📋
 
 ```typescript
-// DENTRO DO NOVO ARQUIVO: api/sales/index.ts
+// DENTRO DO ARQUIVO: api/sales/index.ts
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { withDbConnection, query } from '../lib/db.js'; // Importando suas funções do banco
-import { SalesData } from '../../types'; // Importando seu tipo, se necessário
+import { withDbConnection, query } from '../lib/db.js';
+import { SalesData } from '../../types';
 
 const handler = async (req: VercelRequest, res: VercelResponse) => {
   // --- DIAGNÓSTICO ---
@@ -35,11 +72,10 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
 };
 
 // --- FUNÇÃO PARA BUSCAR TODAS AS VENDAS ---
-async function getAllSales(_req: VercelRequest, res: VercelResponse) { // <-- A CORREÇÃO ESTÁ AQUI
+async function getAllSales(_req: VercelRequest, res: VercelResponse) {
   try {
     // =============================================================
     // SUA LÓGICA PARA BUSCAR TODAS AS VENDAS NO BANCO DE DADOS AQUI
-    // Exemplo:
     const salesResult = await query(`
       SELECT s.id, s.created_at, s.valor_total as "valorTotal", e.name as "nomeEvento", c.primeiro_nome as "primeiroNome", c.sobrenome
       FROM sales s
@@ -70,10 +106,10 @@ async function createSale(req: VercelRequest, res: VercelResponse) {
 
     // =============================================================
     // SUA LÓGICA COMPLETA PARA INSERIR UMA NOVA VENDA E CLIENTE NO BANCO
-    // Isso pode envolver múltiplas queries dentro de uma transação.
     // =============================================================
 
     console.log('Dados recebidos para criar venda:', saleData);
+    
     // Resposta temporária de sucesso
     return res.status(201).json({ message: 'Venda criada com sucesso!', data: saleData });
 
@@ -84,4 +120,7 @@ async function createSale(req: VercelRequest, res: VercelResponse) {
 }
 
 export default withDbConnection(handler as any);
+
 ```
+
+Depois de fazer isso, salve o arquivo e envie para a Vercel novamente. Os erros de compilação devem desaparecer.
