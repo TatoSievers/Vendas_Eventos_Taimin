@@ -3,40 +3,27 @@
 import { neon, neonConfig } from '@neondatabase/serverless';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Enable connection caching for better performance in a serverless environment.
 neonConfig.fetchConnectionCache = true;
 
-// Ensure the database URL is configured in environment variables.
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL environment variable is not set');
 }
 
 const sql = neon(process.env.DATABASE_URL);
 
-/**
- * Executes a SQL query against the Neon database.
- * @param queryText The SQL query string with placeholders (e.g., $1, $2).
- * @param params An array of parameters to safely inject into the query.
- * @returns The result of the query.
- */
 export async function query(queryText: string, params: any[] = []) {
   try {
     const start = Date.now();
-    // Fix: Pass `params` as a single array to match the `sql(query, params)` function signature.
-    // Spreading `params` (...params) causes a type error because it matches the tagged template literal overload `sql(template, ...values)`.
     const result = await sql(queryText, params);
     const duration = Date.now() - start;
-    // Basic logging for monitoring query performance.
     console.log('Executed query', { queryText, duration, rows: Array.isArray(result) ? result.length : 0 });
     return result;
   } catch (error) {
     console.error('Error executing query:', { queryText, params, error });
-    // Re-throw the error to be caught by the handler's error handling.
     throw error;
   }
 }
 
-// The complete database schema definition.
 const dbSchema = `
   CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL);
   CREATE TABLE IF NOT EXISTS events (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, date DATE NOT NULL);
@@ -53,43 +40,25 @@ const dbSchema = `
 
 let dbInitialized = false;
 
-/**
- * Initializes the database by creating tables if they don't exist.
- * This runs only once per serverless function instance.
- */
 async function initDb() {
   if (dbInitialized) return;
   console.log("Initializing database schema...");
   try {
-    // Split the schema string into individual, non-empty commands.
-    const commands = dbSchema
-      .split(';')
-      .map(cmd => cmd.trim())
-      .filter(cmd => cmd.length > 0);
-
-    // Execute each command sequentially.
+    const commands = dbSchema.split(';').map(cmd => cmd.trim()).filter(cmd => cmd.length > 0);
     for (const command of commands) {
       await query(command);
     }
-    
     dbInitialized = true;
     console.log("Database schema initialized successfully.");
-  } catch (error) {
-    console.error("Failed to initialize database schema:", error);
-    // If initialization fails, subsequent queries will likely fail, but we throw to signal a critical issue.
-    throw new Error('Could not initialize database.');
+  } catch (error: any) {
+    // ESTA É A MUDANÇA IMPORTANTE: AGORA VAMOS VER O ERRO ORIGINAL
+    console.error("ERRO DETALHADO NA INICIALIZAÇÃO DO BANCO:", JSON.stringify(error, null, 2));
+    throw new Error(`Could not initialize database. Original Error: ${error.message}`);
   }
 }
 
-// Type definition for a standard Vercel API handler.
 type ApiHandler = (req: VercelRequest, res: VercelResponse) => Promise<void | VercelResponse>;
 
-/**
- * A higher-order function that wraps an API handler to ensure the database
- * is initialized before the handler logic runs.
- * @param handler The API handler function to wrap.
- * @returns A new handler function with database connection logic.
- */
 export const withDbConnection = (handler: ApiHandler) => async (req: VercelRequest, res: VercelResponse) => {
   try {
     await initDb();
@@ -97,7 +66,7 @@ export const withDbConnection = (handler: ApiHandler) => async (req: VercelReque
   } catch (error: any) {
     console.error('API Handler Error:', error);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'An internal server error occurred.' });
+      res.status(500).json({ error: 'An internal server error occurred.', details: error.message });
     }
   }
 };
