@@ -1,46 +1,24 @@
+// DENTRO DE: api/customers/[cpf].ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-// Fix: Corrected import path to resolve to the 'db.js' module within the 'api/lib' directory.
-import { withDbConnection, query } from '../lib/db.js';
+import { query } from '../lib/db.js';
 
-const handler = async (req: VercelRequest, res: VercelResponse) => {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
-
-  const { cpf } = req.query;
-
-  if (typeof cpf !== 'string' || !cpf) {
-    return res.status(400).json({ error: 'CPF is required' });
-  }
-
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    const result = await query(`
-        SELECT 
-            primeiro_nome as "primeiroNome",
-            sobrenome,
-            email,
-            ddd,
-            telefone_numero as "telefoneNumero",
-            logradouro_rua as "logradouroRua",
-            numero_endereco as "numeroEndereco",
-            complemento,
-            bairro,
-            cidade,
-            estado,
-            cep
-        FROM customers 
-        WHERE cpf = $1
-    `, [cpf]);
+    const { cpf } = req.query;
 
-    if (result.length > 0) {
-      return res.status(200).json(result[0]);
-    } else {
-      return res.status(404).json({ message: 'Customer not found' });
+    if (req.method === 'GET') {
+      const customerResult = await query('SELECT * FROM customers WHERE cpf = $1', [cpf]);
+      if (customerResult.length === 0) {
+        return res.status(404).json({ error: 'Customer not found.' });
+      }
+      return res.status(200).json(customerResult[0]);
     }
-  } catch (error: any) {
-    console.error(`Failed to fetch customer with CPF ${cpf}:`, error);
-    return res.status(500).json({ error: 'Database query failed', details: error.message });
-  }
-};
 
-export default withDbConnection(handler as any);
+    res.setHeader('Allow', ['GET']);
+    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+
+  } catch (error: any) {
+    console.error('ERRO EM /api/customers/[cpf]:', error);
+    return res.status(500).json({ error: 'Erro interno no servidor.', details: error.message });
+  }
+}
